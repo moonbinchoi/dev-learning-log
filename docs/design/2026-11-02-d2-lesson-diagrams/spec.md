@@ -42,7 +42,7 @@ THE SYSTEM은 R1~R6에서 레슨을 만드는 Claude, R7과 R12~R15에서 레슨
 Test seams: `docs/learning/test_render_diagram.py`가 `adapt()`와 `embed()`를 직접 호출한다. 렌더 전체는 샘플 `.d2`로 스크립트를 실행해 출력 줄과 SVG, PNG 파일을 본다. 단계 강조와 다크 표시는 저장소에 자동 시험이 없고, `check-layout.py`와 이미지 검토로 본다.
 
 ## Alternatives
-아래 사유는 2026-11-02 조사와 시험 결과이며 근거는 `.scratch/lesson-diagrams/`에 있다.
+아래 사유는 2026-11-02 조사와 시험 결과이며 근거는 `docs/research/lesson-diagrams/`에 있다.
 
 - Do nothing: 레슨마다 그림을 손으로 그려야 하고, 교재 그림이 있는데도 직접 그리는 일이 반복된다.
 - Hand-written SVG + CSS: 좌표를 손으로 맞춰야 해서 G5를 못 채운다.

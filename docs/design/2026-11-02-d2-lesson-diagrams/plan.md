@@ -79,7 +79,7 @@ Covers: R7, R15
 
 - [x] 다크 값이 `style.css` 한 곳에 있고 `--c-1f1f1f` 등 테마 색 전부를 덮는다.
 - [x] `.stepper:has(input[value="N"]:checked)`가 `.S<N>` 상자와 `tr[data-step="N"]`을 함께 강조한다(N 1~7).
-- 검증 종류: 둘 다 기록된 시험. R7은 일회용 `.scratch/lesson-diagrams/trial/click-test.py`와 `e2e-build.py`로 7단계를 DOM 클릭해 7/7 강조를 확인했다. R15는 같은 시험 레슨을 `check-layout.py` 다크 500px로 돌린 결과다. 둘 다 저장소 시험이 아니며 이번 세션에 다시 돌리지 않았다.
+- 검증 종류: 둘 다 기록된 시험. R7은 일회용 `docs/research/lesson-diagrams/trial/click-test.py`와 `e2e-build.py`로 7단계를 DOM 클릭해 7/7 강조를 확인했다. R15는 같은 시험 레슨을 `check-layout.py` 다크 500px로 돌린 결과다. 둘 다 저장소 시험이 아니며 이번 세션에 다시 돌리지 않았다.
 
 ### Task 5: 레슨 작성 규칙과 검토
 Covers: R1, R2, R3, R4, R5, R6, R13
@@ -96,7 +96,7 @@ Covers: R1, R2, R3, R4, R5, R6, R13
 `E:\Study\Inflearn`에서 실행한다. `flow.svg`와 `flow.png`를 시험 폴더에 다시 만드는 것이 정상이다.
 
 ```
-python docs/learning/test_render_diagram.py && python docs/learning/render-diagram.py .scratch/lesson-diagrams/trial/e2e/assets/diagrams/flow.d2
+python docs/learning/test_render_diagram.py && python docs/learning/render-diagram.py docs/research/lesson-diagrams/trial/e2e/assets/diagrams/flow.d2
 ```
 
 기대 출력(2026-11-02 실제 실행, 종료 코드 0):

@@ -43,7 +43,7 @@ THE SYSTEM은 R1~R3에서 Claude Code와 규칙 파일, R4~R9에서 `.tools/im-n
 Test seams: `python -I .tools/im-not-ai/test_check_korean.py`가 산문 추출과 규칙 생성을 덮는다. 나머지는 `check-korean.py <파일>` 출력(R4~R9)과 `sync.py <클론>` 시험 실행 출력(R11, R13~R16)을 본다.
 
 ## Alternatives
-아래 사유는 2026-11-02 조사와 시험 결과이며 근거는 `.scratch/im-not-ai/`에 있다.
+아래 사유는 2026-11-02 조사와 시험 결과이며 근거는 `docs/research/im-not-ai/`에 있다.
 
 - Do nothing: 문체 규칙이 로드되지 않고 레슨 검토에 결정적 근거가 없다.
 - 공식 플러그인(`--scope local`): 버전이 2.3.2로 고정돼 업데이트가 멈추고, 스킬 4개와 에이전트 9개가 통째로 들어온다. 전체 설치(`install.sh`)는 전역(`~/.claude`)이다.

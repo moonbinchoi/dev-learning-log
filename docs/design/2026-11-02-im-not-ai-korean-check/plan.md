@@ -102,14 +102,14 @@ Covers: R1 (recorded trial, 2026-11-02 비강의 세션 관찰), R10 (command ru
 `E:\Study\Inflearn`에서 실행한다.
 
 ```bash
-python -I .tools/im-not-ai/test_check_korean.py && python .tools/im-not-ai/check-korean.py .scratch/im-not-ai/seeded-ai-style-sample.txt
+python -I .tools/im-not-ai/test_check_korean.py && python .tools/im-not-ai/check-korean.py docs/research/im-not-ai/seeded-ai-style-sample.txt
 ```
 
 이 세션에서 실제로 나온 출력이다. 종료 코드는 0이다.
 
 ```
 OK
-.scratch/im-not-ai/seeded-ai-style-sample.txt | 383자 | 11건 | 28.72/1k | {"분열문(D-8)": 1, "이유다(D-10)": 1, "시간지평(D-11)": 1, "은유가족(D-14)": 1, "범용동사(F-7)": 2, "결산변이(D-1)": 1, "conclusion_pivot_count": 4}
+docs/research/im-not-ai/seeded-ai-style-sample.txt | 383자 | 11건 | 28.72/1k | {"분열문(D-8)": 1, "이유다(D-10)": 1, "시간지평(D-11)": 1, "은유가족(D-14)": 1, "범용동사(F-7)": 2, "결산변이(D-1)": 1, "conclusion_pivot_count": 4}
 ```
 
 이어서 걸린 문장이 `  <패턴> | <문장>` 형식으로 7줄 나온다(분열문 D-8, 이유다 D-10, 시간지평 D-11, 은유가족 D-14, 범용동사 F-7 두 줄, 결산변이 D-1). 구현 당시 값 `OK`와 `383자 | 11건 | 28.72/1k`와 같다.

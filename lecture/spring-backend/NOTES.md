@@ -80,7 +80,7 @@
 - **1회차 완료(2026-11-02), 다음은 2회차(리마인드, MVC2 6장).** 커밋 전이면 먼저 `shop`을 커밋한다.
   - 1회차 피드백 처리(2026-11-02): 회차 순서에 동작 모델·따라가기·직접 추적을 넣었고, `docs/learning/lesson-review.md`에 항목 9~11을 더했다. 2회차 첫 적용이다.
   - `im-not-ai`: 글쓰기 규칙은 `.claude/rules/korean-humanize.md`(`lecture/**`에서 로드), 검사는 `python .tools/im-not-ai/check-korean.py <파일>`이다. 패턴 수는 판단 재료이고 합격 기준이 아니다. 도입 범위와 갱신·제거 절차는 `.tools/im-not-ai/README.md`에 있다.
-  - 도식 도구는 D2로 정했다(2026-11-02). Figma는 도입하지 않았다. 손으로 고칠 캔버스가 필요해지면 `@next-ai-drawio/mcp-server`를 먼저 본다. 근거: `.scratch/lesson-diagrams/`.
+  - 도식 도구는 D2로 정했다(2026-11-02). Figma는 도입하지 않았다. 손으로 고칠 캔버스가 필요해지면 `@next-ai-drawio/mcp-server`를 먼저 본다. 근거: `docs/research/lesson-diagrams/`.
   - 2회차 시작 전: 10일 넘게 비면 앞 회차 요약을 먼저 준다. 앱을 다시 띄우면 메모리 저장소는 비어 있다.
   - 2회차 회상 퀴즈(말로 받는다): 검증 실패 때 왜 리다이렉트하지 않는가, `Item`에 `@NotBlank`를 달면 검증되는가, 타입 오류에서 `BindingResult` 유무에 따른 결과와 상태 코드(400과 500의 구분), `addAttribute`의 값이 URL에서 어디로 가는가.
   - 남은 일: `BindingResult`를 폼 파라미터 앞에 두면 어떻게 되는지(진단 Q3-c) 실행 확인을 못 했다. `ItemRepository`의 순번은 0부터 시작한다(선택 수정). `reference/form-validation.html`은 채점 뒤 공개했다.
