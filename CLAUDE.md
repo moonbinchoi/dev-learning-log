@@ -4,7 +4,7 @@ Read course material from `courses/*/docs/*.md`, which mirror `courses/*/pdf/*.p
 
 ## Lessons
 
-`/mattpocock-skills:teach` uses `lecture/<track>/` as its teaching workspace, not the repo root; `lecture/TRACKS.md` lists the tracks. Before teaching, adding course material, or creating a track, follow `docs/learning/operating-rules.md`.
+`/mattpocock-skills:teach` uses `lecture/<track>/` as its teaching workspace, not the repo root; `lecture/TRACKS.md` lists the tracks. Before teaching, adding course material, or creating a track, follow `docs/learning/operating-rules.md`. Prepare each lesson in its own session with `/prepare-lesson <track>` before teaching it.
 
 Project-local reference notes live in `knowledge/`; before writing or grading a topic one of them covers, read `knowledge/index.md` and the matching note.
 
