@@ -9,7 +9,7 @@
   4. 함께 따라가기: 요청 하나를 단계마다 함께 추적한다. 각 단계에서 객체에 어떤 값이 들어 있는지 표로 본다.
   5. 직접 추적: 사용자가 다른 요청으로 같은 표를 채우고, "누가 검사하고 누가 분기하는가" 같은 역할 질문에 자기 말로 답한다. 답하지 못하면 코딩으로 넘어가지 않는다.
   6. 핵심 동작은 실행 전에 결과를 예측하게 한다. 코드의 뜻이 아니라 결과를 묻는다.
-  7. 사용자가 `shop`에 직접 코딩한다. teach의 브라우저 퀴즈 대신 이 실습이 skill 연습이다.
+  7. 사용자가 `shop`에서 `git switch -c lesson-NN`으로 회차 브랜치를 만들고 직접 코딩한다. teach의 브라우저 퀴즈 대신 이 실습이 skill 연습이다.
   8. reviewer가 [grading.md](../../docs/learning/grading.md)로 채점하고, 그 결과와 `git diff`로 사용자와 리뷰 대화를 한다.
   9. 면접 질문 2~3개를 묻고 답을 평가한다. 개념·원인·원리로 평가하고, 코드 줄의 정확한 문법까지 외우게 하지 않는다.
 - 도식과 이미지는 교재 원문이나 인용할 수 있는 공식 자료(Spring 등)의 것을 먼저 쓴다. 없을 때만 직접 그린다. 링크로 보내지 않고 레슨과 강의 중에 사용자가 바로 보게 넣고, 그림 아래에 출처를 적는다.
@@ -29,8 +29,9 @@
 - Java 코드는 사용자가 직접 쓴다. 템플릿 HTML과 `bootstrap.min.css`는 `courses/spring-mvc2/code/`의 예제에서 복사해도 된다.
 
 ## 명령 실행
-- Claude는 상태를 바꾸지 않는 읽기 명령만 직접 실행한다(예: `git status|log|diff`, `docker ps|logs|inspect`, `docker volume ls`). 읽기 명령은 다른 명령과 묶지 않는다.
-- `./gradlew`, 앱 실행, `git commit`처럼 상태를 바꾸는 명령은 사용자에게 치게 한다.
+- Claude는 상태를 바꾸지 않는 읽기 명령과 아래 예외만 직접 실행한다(예: `git status|log|diff`, `docker ps|logs|inspect`, `docker volume ls`). 읽기 명령은 다른 명령과 묶지 않는다.
+- `./gradlew`, 앱 실행, `shop`의 `git commit`·`git switch`·`git merge`처럼 상태를 바꾸는 명령은 사용자에게 치게 한다.
+- 루트 저장소 커밋과 회차 태그만 Claude가 사용자 확인 뒤 실행한다. 커밋은 `CLAUDE.md`의 `## Git` 절차를 따른다.
 
 ## 사용자 환경 다루기
 - 창 구성: 강의는 호스트 VS Code 창(루트 `E:\Study\Inflearn`)의 Claude 패널, 실습 코딩·빌드·실행은 `projects/shop`을 Dev Containers로 연 컨테이너 창. 소스는 bind mount라 호스트 Claude도 같은 파일을 본다. `./gradlew`와 앱 실행은 컨테이너에서만 한다.
@@ -44,8 +45,9 @@
 2. 학습 기록 조건을 채운 내용은 `learning-records/`에 남긴다.
 3. `operating-rules.md` 강의 세션 규칙 7에 따라 트랙 마크다운을 정리한다.
 4. 컨테이너 창에서 앱을 끄게 한다(Ctrl+C). 컨테이너와 볼륨은 남긴다.
-5. `git status`와 `git diff`를 함께 확인한 뒤 `shop`을 커밋한다. 사용자가 요청한 방식이지만 커밋 직전에 확인을 받는다.
-6. 다음 회차는 새 세션에서 시작하라고 안내하고, 이 세션은 여기서 끝낸다.
+5. `git status`와 `git diff`를 함께 확인한다. 커밋 직전에 확인을 받고, 사용자가 `lesson-NN` 브랜치에 커밋한 뒤 `git switch master`와 `git merge --no-ff lesson-NN`을 친다.
+6. 루트 저장소를 `CLAUDE.md`의 `## Git` 절차로 커밋하고, 사용자 확인 뒤 `git tag -a spring-backend/lesson-NN -m "<요약>"`을 실행한다.
+7. 다음 회차는 새 세션에서 시작하라고 안내하고, 이 세션은 여기서 끝낸다.
 
 ## 교재 읽기
 - 교재 경로는 `RESOURCES.md`.

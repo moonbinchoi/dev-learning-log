@@ -8,7 +8,8 @@
 | 학습 | `lecture/<track>/` | teach 학습 공간 하나. `MISSION.md`, `NOTES.md`, `RESOURCES.md`, `learning-records/`, `lessons/`, `reference/`, `assets/`. |
 | 실습 | `projects/<project>/` | 독립 git repo. `.devcontainer/`를 두고 dev container 안에서 빌드·실행한다. 두 트랙이 한 repo를 쓰면 트랙마다 git worktree를 둔다. |
 | 색인 | `lecture/TRACKS.md` | 트랙과 강좌·프로젝트·실행 자원의 대응. |
-| 도구 | `.tools/<tool>/` | 어느 트랙에도 속하지 않는 로컬 실행 파일. git에 넣지 않고, 버전은 `versions.toml`에 등록한다. 쓰는 방법은 그 도구를 부르는 스크립트와 트랙 `NOTES.md`에 적는다. |
+| 도구 | `.tools/<tool>/` | 어느 트랙에도 속하지 않는 로컬 실행 파일. 루트 저장소에서 추적하고, 버전은 `versions.toml`에 등록한다. 쓰는 방법은 그 도구를 부르는 스크립트와 트랙 `NOTES.md`에 적는다. |
+| 임시 | `.scratch/` | git에서 제외한 임시 폴더. 통째로 지워도 되는 것만 둔다. 오래 남길 자료는 `docs/research/`에 둔다. |
 
 - **트랙**은 MISSION 하나와 커리큘럼 하나의 단위다. 강좌와 트랙은 다대다다. 강좌 여러 개가 한 트랙이 되고, 강좌 하나가 여러 트랙으로 나뉜다. 이 대응은 `TRACKS.md`에만 적는다.
 - 트랙 이름은 목표 기준 영어 kebab-case로 짓는다(`spring-backend`). 강좌명으로 지으면 강좌가 더해지거나 나뉠 때 이름이 틀려진다.
@@ -34,7 +35,10 @@
 3. 쓰기는 자기 트랙 폴더와 `TRACKS.md`에 적힌 자기 프로젝트 작업 폴더 안에서만 한다. 그 밖의 파일은 읽기만 한다. 그쪽에 고칠 것이 생기면 자기 `NOTES.md`의 "공유 파일 변경 요청"에 적고 사용자에게 알린다.
 4. 다음에 가르칠 것을 정할 때 다른 트랙의 `learning-records/`도 읽는다. 다른 트랙에서 이해가 증명된 내용은 다시 가르치지 않는다. 인용할 때는 `spring-backend/0003`처럼 트랙 이름을 붙인다.
 5. 앱과 DB는 프로젝트의 dev container 안에서, `TRACKS.md`에 배정된 포트와 DB 이름으로 실행한다.
-6. 커밋은 자기 프로젝트 작업 폴더에서만 한다. Gradle 프로젝트를 새로 만들면 첫 커밋 전에 [versions.md](versions.md)의 "새 Gradle 프로젝트"를 따른다.
+6. 실습 코드는 `TRACKS.md`에 적힌 자기 프로젝트 작업 폴더의 저장소에, 트랙 문서는 루트 저장소에 커밋한다. 루트 저장소 커밋은 `CLAUDE.md`의 `## Git` 절차를 따르고, 실습 코드 커밋은 프로젝트 저장소의 기존 규칙을 따른다. Gradle 프로젝트를 새로 만들면 첫 커밋 전에 [versions.md](versions.md)의 "새 Gradle 프로젝트"를 따른다. 회차를 마친 루트 저장소 커밋에는 사용자 확인 뒤 `git tag -a <track>/lesson-NN -m "<요약>"`으로 태그를 단다. 회차 사이 변경은 `git diff <이전 태그> <태그> -- lecture/<track>`으로 본다.
+   - 이름은 소문자 `<track>/lesson-NN` 한 형식만 쓰고 `NN`은 두 자리다. `<track>`이나 `<track>/lesson`만으로 된 태그와, 태그와 같은 이름의 브랜치는 만들지 않는다.
+   - 원격에 올리기 전에는 `git tag -f`로 고칠 수 있다. 올린 뒤에는 고치지 않고 새 이름을 쓴다.
+   - 원격을 붙이면 `git push --follow-tags`로 올린다.
 7. 회차를 마칠 때, 커밋하기 전에 자기 트랙 폴더의 마크다운을 정리한다. 정리 대상은 다음과 같다.
    - 끝난 일을 위한 줄
    - 다른 문서와 의미가 겹치는 줄. 기준 문서 쪽만 남긴다.
