@@ -1,0 +1,42 @@
+# 레슨 도식 공통 테마. 그림 첫 줄에 `...@lesson-theme`을 둔다.
+# 색을 더하면 assets/style.css의 다크 값도 함께 더한다.
+vars: {
+  d2-config: {
+    theme-id: 0
+    pad: 8
+    layout-engine: elk
+    theme-overrides: {
+      N1: "#1f1f1f"
+      N2: "#6b6b6b"
+      N7: "#fffff8"
+      B1: "#666666"
+      B2: "#666666"
+    }
+  }
+}
+
+classes: {
+  # 상자 역할
+  input: {style: {fill: "#f5f5f5"; stroke: "#666666"; border-radius: 6; font-size: 14; stroke-width: 1}}
+  step: {style: {fill: "#dae8fc"; stroke: "#6c8ebf"; border-radius: 6; font-size: 14; stroke-width: 1}}
+  fail: {style: {fill: "#ffe6cc"; stroke: "#d79b00"; border-radius: 6; font-size: 14; stroke-width: 1}}
+  data: {style: {fill: "#fff2cc"; stroke: "#d6b656"; border-radius: 6; font-size: 14; stroke-width: 1}}
+  done: {style: {fill: "#d5e8d4"; stroke: "#82b366"; border-radius: 6; font-size: 14; stroke-width: 1}}
+  stop: {style: {fill: "#f8cecc"; stroke: "#b85450"; border-radius: 6; font-size: 14; stroke-width: 1}}
+  ask: {shape: diamond; style: {fill: "#e1d5e7"; stroke: "#666666"; font-size: 13; stroke-width: 1}}
+  group: {style: {fill: "#f8f8f4"; stroke: "#ddd8c8"; border-radius: 10; font-size: 14; bold: true; stroke-width: 1}}
+
+  # 선 종류
+  flow: {style: {stroke: "#666666"; stroke-width: 2}}
+  save: {style: {stroke: "#d79b00"; stroke-width: 2; stroke-dash: 5; animated: true}}
+  off: {style: {stroke: "#666666"; stroke-width: 1; stroke-dash: 3; opacity: 0.6}}
+
+  # 단계 강조 표시. 상자에 `class: [step; S3]`처럼 역할과 함께 붙인다
+  S1: {}
+  S2: {}
+  S3: {}
+  S4: {}
+  S5: {}
+  S6: {}
+  S7: {}
+}

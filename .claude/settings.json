@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(**/*.pdf)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Grep|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "E:/Study/Inflearn/.claude/hooks/practice-guard.js"
+            ],
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

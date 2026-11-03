@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>폼과 검증 요약</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>폼과 검증 요약</h1>
+<p class="subtitle">스프링 MVC 2편 2·4·5장. Spring Boot 4.1 기준. 용어는 <a href="glossary.html">용어집</a>.</p>
+
+<h2>등록 처리의 뼈대</h2>
+<pre><code>@PostMapping("/add")
+public String addItem(@Validated @ModelAttribute("item") ItemSaveForm form,
+                      BindingResult bindingResult,          // 검증 대상 바로 다음
+                      RedirectAttributes redirectAttributes) {
+    if (bindingResult.hasErrors()) {
+        return "items/addForm";                             // 오류: 리다이렉트 없이 폼을 다시 그림
+    }
+    Item item = new Item();                                 // 폼 객체 → 도메인 객체
+    item.setItemName(form.getItemName());
+    item.setPrice(form.getPrice());
+    item.setQuantity(form.getQuantity());
+    Item saved = itemRepository.save(item);
+    redirectAttributes.addAttribute("itemId", saved.getId()); // {itemId} 자리에 들어감
+    redirectAttributes.addAttribute("status", true);          // 남은 것은 ?status=true
+    return "redirect:/items/{itemId}";                      // PRG
+}</code></pre>
+
+<h2>규칙</h2>
+<table class="wrap">
+<thead><tr><th>주제</th><th>규칙</th></tr></thead>
+<tbody>
+<tr><td>PRG</td><td>저장 성공 → 리다이렉트. 검증 실패 → 리다이렉트하지 않고 폼 뷰를 반환(입력값과 오류를 모델에 담은 채로).</td></tr>
+<tr><td><code>RedirectAttributes</code></td><td><code>addAttribute</code> 값은 리다이렉트 URL의 <code>{이름}</code>을 채우고, 남은 값은 쿼리 파라미터가 된다. 상세 화면은 <code>th:if="${param.status}"</code>로 메시지를 띄운다.</td></tr>
+<tr><td><code>th:field</code></td><td><code>id</code>·<code>name</code>·<code>value</code>를 만든다. 오류가 있으면 <code>value</code>에 사용자가 입력한 값이 들어간다.</td></tr>
+<tr><td><code>th:errors</code></td><td>그 필드에 오류가 있을 때만 태그를 그리고 메시지를 출력한다.</td></tr>
+<tr><td><code>th:errorclass</code></td><td>그 필드에 오류가 있을 때만 CSS 클래스를 덧붙인다.</td></tr>
+<tr><td><code>BindingResult</code> 있음</td><td>타입 오류가 나도 컨트롤러가 호출된다. <code>typeMismatch</code> <code>FieldError</code>가 담긴다.</td></tr>
+<tr><td><code>BindingResult</code> 없음</td><td>컨트롤러가 호출되지 않고 400 오류.</td></tr>
+<tr><td>검증 순서</td><td>타입 변환 → 성공한 필드만 Bean Validation. 변환 실패 필드는 <code>typeMismatch</code> 하나만.</td></tr>
+<tr><td>폼 객체 분리</td><td>등록·수정은 받는 데이터와 검증 규칙이 다르다 → 폼 객체를 나누면 <code>groups</code>가 필요 없다.</td></tr>
+<tr><td><code>@ModelAttribute("item")</code></td><td>이름을 빼면 모델 키가 <code>itemSaveForm</code>이 되어 템플릿의 <code>th:object="${item}"</code>과 어긋난다.</td></tr>
+</tbody>
+</table>
+
+<h2>Boot 4.1 import</h2>
+<table class="wrap">
+<thead><tr><th>애너테이션</th><th>패키지</th></tr></thead>
+<tbody>
+<tr><td><code>@NotBlank</code> <code>@NotNull</code> <code>@Max</code></td><td><code>jakarta.validation.constraints</code></td></tr>
+<tr><td><code>@Range</code></td><td><code>org.hibernate.validator.constraints</code> (HV 9에도 남음)</td></tr>
+<tr><td><code>@Validated</code></td><td><code>org.springframework.validation.annotation</code></td></tr>
+</tbody>
+</table>
+<p class="muted">Hibernate Validator 9에서 <code>org.hibernate.validator.constraints</code>의 <code>@NotBlank</code>·<code>@NotEmpty</code>·<code>@Email</code>은 삭제됐다. <code>javax.*</code>는 컴파일되지 않는다.</p>
+</main>
+</body>
+</html>

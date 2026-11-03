@@ -1,0 +1,20 @@
+# Single source of versions for every Gradle project in this repo (Gradle version catalog format).
+# courses/*/code/* read this file via settings.gradle. projects/shop and projects/docker-lab keep a copy at gradle/libs.versions.toml.
+# gradle: not read by Gradle. Apply with `./gradlew wrapper --gradle-version <value>` run twice.
+# devcontainer-java: not read by Gradle. Tag of mcr.microsoft.com/devcontainers/java in projects/*/.devcontainer/devcontainer.json; edit both together.
+# d2: not read by Gradle. Version of .tools/d2/d2.exe, the lesson diagram CLI. docs/learning/render-diagram.py checks it.
+# im-not-ai: not read by Gradle. Upstream commit of .tools/im-not-ai/upstream, the Korean prose check. .tools/im-not-ai/sync.py writes it.
+# Library versions are managed by the Spring Boot BOM, so [libraries] is empty.
+
+[versions]
+spring-boot = "4.1.1"
+spring-dependency-management = "1.1.7"
+gradle = "9.8.1"
+java = "25"
+devcontainer-java = "25-trixie"
+d2 = "0.9.0"
+im-not-ai = "b37e020"
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }

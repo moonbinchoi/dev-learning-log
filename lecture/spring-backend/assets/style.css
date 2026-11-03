@@ -1,0 +1,131 @@
+:root {
+  --bg: #fffff8;
+  --fg: #1f1f1f;
+  --muted: #6b6b6b;
+  --rule: #ddd8c8;
+  --accent: #0b5cad;
+  --code-bg: #f3f0e4;
+  --note-bg: #eef4fb;
+  --predict-bg: #fdf3e1;
+  --predict-rule: #91681d;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161616;
+    --fg: #e6e3d9;
+    --muted: #9c988c;
+    --rule: #3a3833;
+    --accent: #6fb0f0;
+    --code-bg: #24231f;
+    --note-bg: #1c2633;
+    --predict-bg: #2e2617;
+    --predict-rule: #b4862d;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 17px/1.7 "Pretendard", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+}
+main { max-width: 720px; margin: 0 auto; padding: 48px 16px 96px; }
+
+h1 { font-size: 1.9rem; line-height: 1.3; margin: 0 0 .25rem; }
+h2 { font-size: 1.3rem; margin: 2.5rem 0 .75rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
+h3 { font-size: 1.05rem; margin: 1.75rem 0 .5rem; }
+.subtitle { color: var(--muted); margin: 0 0 2rem; }
+a { color: var(--accent); }
+.muted { color: var(--muted); }
+
+code, pre { font-family: "JetBrains Mono", "D2Coding", Consolas, monospace; font-size: .88em; }
+code { background: var(--code-bg); padding: .1em .35em; border-radius: 3px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); padding: 12px 14px; border-radius: 4px; overflow-x: auto; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .95em; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 600; }
+td:first-child { white-space: nowrap; }
+/* 칸이 많은 변환표: 좁은 화면에서는 행을 세로로 쌓는다 */
+table.wrap td:first-child { white-space: normal; }
+/* 키 이름 칸과 헤더의 코드는 한 덩어리로 둔다 */
+table.wrap td:first-child code, th code { white-space: nowrap; overflow-wrap: normal; }
+@media (max-width: 640px) {
+  table.wrap th { display: none; }
+  table.wrap tr { display: block; padding: 6px 0; border-bottom: 1px solid var(--rule); }
+  table.wrap td { display: block; border: 0; padding: 2px 10px; }
+}
+
+.note { background: var(--note-bg); padding: 12px 16px; border-radius: 4px; margin: 1rem 0; }
+
+/* 예측 후 실행: 명령 전에 사용자가 결과를 먼저 예측한다 */
+.predict { background: var(--predict-bg); border-left: 4px solid var(--predict-rule); padding: 10px 16px; margin: 1rem 0; }
+.predict::before { content: "예측"; display: block; font-weight: 700; font-size: .85em; color: var(--predict-rule); }
+
+ol.steps > li { margin-bottom: 1.5rem; }
+figure { margin: 1.5rem 0; }
+figure svg { width: 100%; height: auto; color: var(--muted); }
+figcaption { color: var(--muted); font-size: .9em; }
+svg text { fill: var(--fg); font-family: inherit; }
+svg .box { fill: none; stroke: var(--fg); }
+svg .box-accent { fill: none; stroke: var(--accent); stroke-width: 2; }
+svg .arrow { stroke: var(--muted); fill: none; }
+
+/* D2 도식: D2가 맑은 고딕으로 크기를 쟀으므로 같은 글꼴로 그린다. render-diagram.py가 색 hex를 var(--c-<hex>, #<hex>)로 바꾸므로 다크 값만 여기 둔다 */
+svg[data-d2-version] text { font-family: "Malgun Gothic", sans-serif !important; }
+svg[data-d2-version] .text-bold { font-weight: 700; }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-1f1f1f: #e6e3d9; --c-6b6b6b: #b4b0a4; --c-fffff8: #161616; --c-666666: #9c988c;
+    --c-f5f5f5: #24231f; --c-dae8fc: #1c2b40; --c-6c8ebf: #6f9fd8;
+    --c-ffe6cc: #3a2810; --c-d79b00: #e0a52a;
+    --c-fff2cc: #332b12; --c-d6b656: #c9a93f;
+    --c-d5e8d4: #1d3020; --c-82b366: #7fb56a;
+    --c-f8cecc: #3f1f1d; --c-b85450: #d9736e;
+    --c-e1d5e7: #2e2536;
+    --c-f8f8f4: #1c1c1a; --c-ddd8c8: #3a3833;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  svg[data-d2-version] * { animation: none !important; }
+}
+
+/* 그림 범례: 상자 색은 lesson-theme.d2의 역할과 같다 */
+.legend { display: flex; flex-wrap: wrap; gap: .25rem .5rem; list-style: none; padding: 0; margin: .5rem 0; font-size: .9em; }
+.legend li { padding: 0 .5em; border: 1px solid var(--rule); border-radius: 4px; }
+.legend .input { background: var(--c-f5f5f5, #f5f5f5); border-color: var(--c-666666, #666666); }
+.legend .step { background: var(--c-dae8fc, #dae8fc); border-color: var(--c-6c8ebf, #6c8ebf); }
+.legend .fail { background: var(--c-ffe6cc, #ffe6cc); border-color: var(--c-d79b00, #d79b00); }
+.legend .data { background: var(--c-fff2cc, #fff2cc); border-color: var(--c-d6b656, #d6b656); }
+.legend .done { background: var(--c-d5e8d4, #d5e8d4); border-color: var(--c-82b366, #82b366); }
+.legend .stop { background: var(--c-f8cecc, #f8cecc); border-color: var(--c-b85450, #b85450); }
+.legend .ask { background: var(--c-e1d5e7, #e1d5e7); border-color: var(--c-666666, #666666); }
+
+/* 단계 보기: 고른 단계의 상자(.S<N>)와 표 줄(tr[data-step="N"])을 강조한다. JS 없이 7단계까지 */
+.step-tabs { display: flex; gap: .25rem; flex-wrap: wrap; border: 0; padding: 0; margin: 1rem 0 0; }
+.step-tabs label { padding: 2px 12px; border: 1px solid var(--rule); border-radius: 4px; cursor: pointer; }
+.step-tabs label:has(:checked) { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.step-tabs label:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+.step-tabs input { position: absolute; opacity: 0; }
+.stepper:has(input[value="1"]:checked) :is(.S1 > .shape > *, tr[data-step="1"]),
+.stepper:has(input[value="2"]:checked) :is(.S2 > .shape > *, tr[data-step="2"]),
+.stepper:has(input[value="3"]:checked) :is(.S3 > .shape > *, tr[data-step="3"]),
+.stepper:has(input[value="4"]:checked) :is(.S4 > .shape > *, tr[data-step="4"]),
+.stepper:has(input[value="5"]:checked) :is(.S5 > .shape > *, tr[data-step="5"]),
+.stepper:has(input[value="6"]:checked) :is(.S6 > .shape > *, tr[data-step="6"]),
+.stepper:has(input[value="7"]:checked) :is(.S7 > .shape > *, tr[data-step="7"]) {
+  stroke: var(--accent) !important;
+  stroke-width: 3 !important;
+  background: var(--note-bg);
+}
+
+nav.lesson-nav { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+
+@media print {
+  body { background: #fff; color: #000; font-size: 11pt; }
+  main { padding: 0; max-width: none; }
+  .predict, .note, pre { break-inside: avoid; }
+  a { color: inherit; }
+}

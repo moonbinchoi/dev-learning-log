@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3회차 · 네트워크</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+
+<h1>3회차 · 네트워크</h1>
+<p class="subtitle">오늘의 성과: 포트를 publish하지 않은 postgres에 다른 컨테이너가 <code>pg</code>라는 이름으로 접속해 2회차의 <code>hello</code>를 읽는다.</p>
+
+<p>4회차에 만드는 앱 컨테이너는 DB 주소가 필요하다. IP는 컨테이너를 다시 만들 때마다 바뀔 수 있으므로 이름으로 찾아야 한다. 5회차 Compose의 서비스 이름 접속도 오늘 배우는 기능 위에서 돈다. 용어는 <a href="../reference/glossary.html">용어집</a>을 따른다.</p>
+
+<h2>1. 컨테이너에 닿는 두 길</h2>
+<figure>
+<svg viewBox="0 0 720 300" role="img" aria-label="호스트의 브라우저는 publish된 포트 8081을 거쳐 web 컨테이너의 80번에 닿는다. labnet 네트워크 안의 client 컨테이너는 publish 없이 pg라는 이름으로 pg 컨테이너의 5432번에 닿는다">
+  <rect class="box" x="10" y="20" width="170" height="260" rx="4"/>
+  <text x="26" y="48" font-weight="700">Windows 호스트</text>
+  <rect class="box" x="26" y="80" width="138" height="50" rx="4"/>
+  <text x="40" y="111" font-size="14">브라우저</text>
+
+  <rect class="box" x="220" y="20" width="490" height="260" rx="4" stroke-dasharray="6 4"/>
+  <text x="236" y="48" font-weight="700">WSL 2 VM (데몬)</text>
+
+  <rect class="box" x="400" y="62" width="290" height="80" rx="4"/>
+  <text x="414" y="84" font-size="13">기본 bridge</text>
+  <rect class="box-accent" x="560" y="80" width="116" height="48" rx="4"/>
+  <text x="572" y="109" font-size="14">web :80</text>
+  <path class="arrow" d="M164 105 H560" marker-end="url(#a)"/>
+  <text x="236" y="96" font-size="13">localhost:8081</text>
+  <text x="236" y="128" font-size="13">publish → :80</text>
+
+  <rect class="box" x="240" y="166" width="450" height="98" rx="4"/>
+  <text x="254" y="188" font-size="13">사용자 정의 bridge labnet — 이름 DNS 있음</text>
+  <rect class="box" x="256" y="200" width="130" height="48" rx="4"/>
+  <text x="270" y="229" font-size="14">client</text>
+  <rect class="box-accent" x="560" y="200" width="116" height="48" rx="4"/>
+  <text x="572" y="229" font-size="14">pg :5432</text>
+  <path class="arrow" d="M386 224 H560" marker-end="url(#a)"/>
+  <text x="406" y="216" font-size="13">-h pg (publish 없음)</text>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="currentColor"/></marker></defs>
+</svg>
+<figcaption>위: 밖(호스트)에서 들어오는 길. 아래: 같은 네트워크 안의 컨테이너끼리 다니는 길. 드라이버에는 이 밖에 host·none·overlay 등이 있다. 오늘은 bridge만 쓴다. (<a href="https://docs.docker.com/engine/network/">Networking overview</a>)</figcaption>
+</figure>
+
+<h2>2. publish와 EXPOSE</h2>
+<ul>
+<li><code>-p 8081:80</code>은 호스트의 8081을 컨테이너의 TCP 80에 연결한다. <b>호스트 쪽이 앞</b>이다. (<a href="https://docs.docker.com/engine/network/port-publishing/#publishing-ports">Port publishing</a>)</li>
+<li>호스트 주소를 생략하면 호스트의 <b>모든 주소</b>(<code>0.0.0.0</code>, <code>[::]</code>)에 publish된다. 문서는 "포트 publish는 기본적으로 안전하지 않다"고 경고한다. 호스트에서만 쓰려면 <code>-p 127.0.0.1:8081:80</code>처럼 주소를 붙인다. (<a href="https://docs.docker.com/engine/network/port-publishing/">Port publishing</a>)</li>
+<li>Dockerfile의 <code>EXPOSE</code>는 <b>실제로 publish하지 않는다</b>. 이미지를 만든 사람이 "이 포트를 쓴다"고 적어 두는 문서 역할이다. (<a href="https://docs.docker.com/reference/dockerfile/#expose">Dockerfile reference — EXPOSE</a>)</li>
+<li><code>-P</code>(대문자)는 <code>EXPOSE</code>된 포트를 전부 호스트의 무작위 높은 번호 포트에 publish한다. (<a href="https://docs.docker.com/reference/cli/docker/container/run/#publish-all">run --publish-all</a>)</li>
+</ul>
+
+<h2>3. 기본 bridge와 사용자 정의 bridge</h2>
+<p><code>--network</code>를 주지 않은 컨테이너는 전부 기본 <code>bridge</code> 네트워크에 붙는다. 1·2회차의 컨테이너도 모두 여기 있었다. (<a href="https://docs.docker.com/engine/network/drivers/bridge/#use-the-default-bridge-network">Bridge — default bridge</a>)</p>
+<table>
+<tr><th></th><th>기본 <code>bridge</code></th><th>사용자 정의 bridge (<code>network create</code>)</th></tr>
+<tr><td>서로 찾는 법</td><td>IP로만. 이름은 legacy <code>--link</code>로만</td><td>컨테이너 <b>이름</b>이나 별칭으로 (자동 DNS)</td></tr>
+<tr><td>누가 같이 있나</td><td><code>--network</code> 없이 띄운 모든 컨테이너. 상관없는 것끼리도 통신한다</td><td>그 네트워크에 붙인 컨테이너만</td></tr>
+<tr><td>붙이고 떼기</td><td>빼려면 멈추고 다른 옵션으로 다시 만든다</td><td>실행 중에 <code>network connect / disconnect</code></td></tr>
+</table>
+<p>같은 사용자 정의 bridge에 있는 컨테이너끼리는 <b>모든 포트가 서로 열려 있다</b>. <code>-p</code>는 다른 네트워크나 호스트 밖에서 들어올 때만 필요하다.</p>
+<p class="muted">근거: <a href="https://docs.docker.com/engine/network/drivers/bridge/#differences-between-user-defined-bridges-and-the-default-bridge">Bridge — Differences between user-defined bridges and the default bridge</a>.</p>
+
+<div class="note"><b>2회차와 비교.</b> 마운트는 <code>create</code> 때 정해져서 바꾸려면 컨테이너를 다시 만들어야 했다. 사용자 정의 네트워크는 실행 중인 컨테이너에 붙였다 뗄 수 있다.</div>
+
+<h2>4. 오늘 쓰는 명령</h2>
+<table>
+<tr><th>명령</th><th>하는 일</th></tr>
+<tr><td><code>run -p 호스트:컨테이너</code></td><td>호스트 포트를 컨테이너 포트에 publish한다. (<a href="https://docs.docker.com/reference/cli/docker/container/run/#publish">run -p</a>)</td></tr>
+<tr><td><code>run -P</code></td><td><code>EXPOSE</code>된 포트를 모두 무작위 호스트 포트에 publish한다.</td></tr>
+<tr><td><code>run --network 이름</code></td><td>컨테이너를 그 네트워크에 붙여 만든다. (<a href="https://docs.docker.com/reference/cli/docker/container/run/#network">run --network</a>)</td></tr>
+<tr><td><code>port 컨테이너</code></td><td>그 컨테이너의 포트 매핑을 보여 준다. (<a href="https://docs.docker.com/reference/cli/docker/container/port/">docker port</a>)</td></tr>
+<tr><td><code>image inspect -f</code></td><td><code>-f "{{json .Config.ExposedPorts}}"</code>: 이미지 설정 중 <code>EXPOSE</code>된 포트만 JSON으로 뽑는다. <code>-f</code>는 출력 형식(Go 템플릿)을 정한다. (<a href="https://docs.docker.com/reference/cli/docker/inspect/">docker inspect</a>)</td></tr>
+<tr><td><code>network create 이름</code></td><td>사용자 정의 bridge 네트워크를 만든다. 드라이버 기본값이 bridge다. (<a href="https://docs.docker.com/reference/cli/docker/network/create/">network create</a>)</td></tr>
+<tr><td><code>network inspect 이름</code></td><td>네트워크 상세. <code>Containers</code>에 붙은 컨테이너와 IP가 나온다.</td></tr>
+<tr><td><code>network connect</code></td><td>실행 중인 컨테이너를 네트워크에 붙인다. (<a href="https://docs.docker.com/reference/cli/docker/network/connect/">network connect</a>)</td></tr>
+<tr><td><code>psql -h 주소</code></td><td><code>-e PGPASSWORD=pw</code>로 넘긴 값을 <code>psql</code>이 비밀번호로 읽고, <code>-h</code>로 준 주소의 서버에 접속한다. (<a href="https://www.postgresql.org/docs/current/libpq-envars.html">libpq 환경 변수</a>)</td></tr>
+</table>
+
+<h2>5. 실습 — 예측하고 직접 친다</h2>
+<p>PowerShell(<code>lab</code> 터미널)에서 친다. 명령마다 예측을 먼저 말하고, <code>Clear-Host</code> 후 실행한 뒤 <code>@terminal:lab</code>으로 보여 준다.</p>
+
+<h3>A. publish와 EXPOSE</h3>
+<ol class="steps">
+<li>
+<p><code>-p</code> 없이 nginx를 띄운다.</p>
+<pre><code>docker run -d --name web nginx
+docker ps</code></pre>
+<div class="predict"><code>PORTS</code> 칸에 무엇이 나올까? 통합 브라우저로 <code>http://localhost:80</code>을 열면 Welcome 페이지가 보일까?</div>
+</li>
+<li>
+<p>nginx 이미지에 적힌 <code>EXPOSE</code>를 본다.</p>
+<pre><code>docker image inspect -f "{{json .Config.ExposedPorts}}" nginx</code></pre>
+<div class="predict">우리는 포트를 지정한 적이 없다. 무엇이 나올까? 1번의 <code>PORTS</code> 칸과 어떤 관계일까?</div>
+</li>
+<li>
+<p>publish해서 다시 만든다. <code>docker port</code>는 포트 매핑을 보여 준다.</p>
+<pre><code>docker rm -f web
+docker run -d --name web -p 8081:80 nginx
+docker port web</code></pre>
+<div class="predict"><code>docker port</code>는 몇 줄을 출력할까? 호스트 쪽 주소에는 무엇이 찍힐까? 이번엔 <code>http://localhost:8081</code>이 열릴까?</div>
+</li>
+<li>
+<p><code>-P</code>(대문자)로 하나 더 띄운다.</p>
+<pre><code>docker run -d --name web2 -P nginx
+docker port web2</code></pre>
+<div class="predict">호스트 포트는 몇 번이 될까? 이 포트 번호는 어디서 정해졌을까?</div>
+<p>확인한 뒤 지운다.</p>
+<pre><code>docker rm -f web web2</code></pre>
+</li>
+</ol>
+
+<h3>B. 기본 bridge에는 이름이 없다</h3>
+<ol class="steps" start="5">
+<li>
+<p>2회차의 <code>pgdata</code>를 붙여 postgres를 띄운다. <code>-p</code>는 주지 않는다. 이미 초기화된 볼륨이라 비밀번호는 <code>pw</code>, DB는 <code>docker_lab</code> 그대로다.</p>
+<pre><code>docker run -d --name pg -e POSTGRES_PASSWORD=pw -v pgdata:/var/lib/postgresql postgres:18</code></pre>
+</li>
+<li>
+<p>다른 컨테이너에서 이름으로 접속한다. 클라이언트도 <code>postgres:18</code> 이미지를 쓴다. 그 안의 <code>psql</code>만 빌려 쓰고 <code>--rm</code>으로 바로 지운다.</p>
+<pre><code>docker run --rm -e PGPASSWORD=pw postgres:18 psql -h pg -U postgres -d docker_lab -c "SELECT * FROM memo;"</code></pre>
+<div class="predict">두 컨테이너는 모두 기본 bridge에 있다. <code>hello</code>가 나올까? 실패한다면 어느 단계(이름 찾기, 연결, 인증)에서 실패할까?</div>
+</li>
+<li>
+<p>기본 bridge에 붙은 컨테이너의 IP를 본다.</p>
+<pre><code>docker network inspect bridge</code></pre>
+<p><code>Containers</code> 아래 <code>pg</code>의 <code>IPv4Address</code>에서 <code>/16</code> 앞부분을 쓴다.</p>
+<pre><code>docker run --rm -e PGPASSWORD=pw postgres:18 psql -h &lt;pg의 IP&gt; -U postgres -d docker_lab -c "SELECT * FROM memo;"</code></pre>
+<div class="predict">IP로는 될까? 된다면 이 방법을 4회차 앱 설정에 그대로 쓰면 무엇이 문제일까?</div>
+</li>
+</ol>
+
+<h3>C. 사용자 정의 bridge — 오늘의 핵심</h3>
+<ol class="steps" start="8">
+<li>
+<p>네트워크를 만들고, <b>실행 중인</b> <code>pg</code>를 붙인다.</p>
+<pre><code>docker network create labnet
+docker network connect labnet pg
+docker network inspect labnet</code></pre>
+<div class="predict"><code>pg</code>를 다시 만들지 않았다. <code>connect</code>가 성공할까? 이제 <code>pg</code>는 네트워크 몇 개에 붙어 있을까?</div>
+</li>
+<li>
+<p>클라이언트를 <code>labnet</code>에 붙여 이름으로 접속한다.</p>
+<pre><code>docker run --rm --network labnet -e PGPASSWORD=pw postgres:18 psql -h pg -U postgres -d docker_lab -c "SELECT * FROM memo;"</code></pre>
+<div class="predict"><code>pg</code>는 5432를 publish하지 않았다. <code>hello</code>가 나올까? 근거를 3절의 표로 말한다.</div>
+</li>
+</ol>
+
+<h2>6. 남겨 둘 것</h2>
+<p>4회차에 앱 컨테이너를 <code>labnet</code>에 붙여 <code>pg</code>에 접속시킨다. <code>labnet</code>과 <code>pgdata</code>는 지우지 않는다. 5회차 Compose로 옮길 때 정리한다.</p>
+
+<h2>더 읽을 것</h2>
+<p>1차 자료: <a href="https://docs.docker.com/engine/network/drivers/bridge/">Docker docs — Bridge network driver</a>. 기본 bridge와 사용자 정의 bridge의 차이 다섯 가지, 네트워크 만들고 붙이는 법을 다룬다. 이어서 <a href="https://docs.docker.com/engine/network/port-publishing/">Port publishing and mapping</a>에서 바인딩 주소와 보안 경고를 읽는다.</p>
+
+<div class="note">막히거나 출력이 예측과 다르면 <code>@terminal:lab</code>으로 보여 주고 물어보세요. Claude가 이 과정의 선생님입니다.</div>
+
+<nav class="lesson-nav">
+<a href="0003-volumes-and-bind-mounts.html">← 2회차 · 데이터</a>
+<a href="../reference/glossary.html">용어집 →</a>
+</nav>
+
+</main>
+</body>
+</html>

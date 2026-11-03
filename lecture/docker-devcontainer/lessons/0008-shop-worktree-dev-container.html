@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>7회차 · shop에 dev container 적용</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+
+<h1>7회차 · shop에 dev container 적용</h1>
+<p class="subtitle">오늘의 성과: shop의 새 브랜치를 별도 폴더(worktree)로 꺼내고, 그 폴더를 dev container로 열어 <code>./gradlew build</code>를 통과시킨다. 컨테이너 안에서 git이 동작하게 만든 뒤, <code>.devcontainer/devcontainer.json</code>을 그 브랜치에 커밋한다.</p>
+
+<p>6회차에는 연습용 docker-lab에 dev container를 붙였다. 오늘은 포트폴리오 저장소인 shop에 붙인다. shop은 spring-backend 트랙이 <code>projects/shop</code> 폴더에서 <code>master</code> 브랜치로 쓰고 있다. 그 폴더를 건드리지 않으려고 git 브랜치와 worktree를 처음 쓴다. 용어는 <a href="../reference/glossary.html">용어집</a>을 따른다.</p>
+
+<h2>1. 브랜치와 HEAD</h2>
+<ul>
+<li>커밋은 그 시점의 파일 전체 스냅샷이고, 바로 앞 커밋을 가리킨다.</li>
+<li><b>브랜치</b>는 커밋 하나를 가리키는 가벼운 포인터다. 실제로는 커밋 ID 40자를 담은 작은 파일이다. 새 커밋을 만들면 지금 브랜치가 그 커밋으로 옮겨 간다. (<a href="https://git-scm.com/book/en/v2/Git-Branching-Branches-in-a-Nutshell">Branches in a Nutshell</a>)</li>
+<li><b>HEAD</b>는 "지금 내가 있는 브랜치"를 가리키는 포인터다. 브랜치를 새로 만들기만 하면 HEAD는 옮겨 가지 않는다. (같은 문서)</li>
+<li>그래서 브랜치를 만드는 것은 파일을 복사하는 일이 아니다. 같은 커밋에 이름표를 하나 더 붙이는 일이다.</li>
+</ul>
+
+<h2>2. worktree: 한 저장소, 작업 폴더 둘</h2>
+<figure>
+<svg viewBox="0 0 720 300" role="img" aria-label="가운데에 커밋 세 개가 a384a3f, 76548cc, 4d251af 순서로 이어진다. master와 docker-devcontainer 두 브랜치가 모두 4d251af를 가리킨다. 위쪽 projects/shop 폴더의 HEAD는 master를, 아래쪽 projects/shop-docker-devcontainer 폴더의 HEAD는 docker-devcontainer를 가리킨다. 커밋과 브랜치는 projects/shop/.git 하나에 저장된다">
+  <rect class="box" x="10" y="10" width="240" height="70" rx="4"/>
+  <text x="24" y="38" font-size="14">projects/shop</text>
+  <text x="24" y="62" font-size="13" class="muted">작업 폴더 1 · HEAD → master</text>
+  <rect class="box-accent" x="10" y="220" width="300" height="70" rx="4"/>
+  <text x="24" y="248" font-size="14">projects/shop-docker-devcontainer</text>
+  <text x="24" y="272" font-size="13" class="muted">작업 폴더 2 · HEAD → docker-devcontainer</text>
+
+  <rect class="box" x="300" y="105" width="410" height="90" rx="4"/>
+  <text x="314" y="125" font-size="12" class="muted">projects/shop/.git (커밋·브랜치 저장소는 하나)</text>
+  <text x="318" y="160" font-size="13">a384a3f ← 76548cc ← 4d251af</text>
+  <text x="560" y="182" font-size="12">master</text>
+  <text x="600" y="150" font-size="12" class="muted">docker-devcontainer</text>
+  <path class="arrow" d="M250 45 L560 172" marker-end="url(#a)"/>
+  <path class="arrow" d="M310 255 L620 155" marker-end="url(#a)"/>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="currentColor"/></marker></defs>
+</svg>
+<figcaption>worktree를 만든 직후. 두 브랜치는 같은 커밋 <code>4d251af</code>을 가리키고, 폴더마다 HEAD가 따로 있다. 커밋 ID는 2026-10-16 shop의 실제 값이다.</figcaption>
+</figure>
+<ul>
+<li>git 저장소 하나에 작업 폴더(worktree)를 여러 개 붙일 수 있다. 폴더마다 다른 브랜치를 꺼내 놓고 동시에 작업한다. 원래 폴더는 <b>main worktree</b>, 새로 붙인 폴더는 <b>linked worktree</b>다. (<a href="https://git-scm.com/docs/git-worktree">git-worktree</a>)</li>
+<li>커밋과 브랜치는 공유한다. 한 폴더에서 만든 커밋은 다른 폴더에서도 <code>git log</code>로 보인다.</li>
+<li>같은 브랜치를 두 worktree에서 동시에 꺼낼 수 없다. git이 거부한다. (같은 문서, <code>add</code>)</li>
+<li>linked worktree 맨 위의 <code>.git</code>은 폴더가 아니라 <b>파일</b>이다. 안에는 main worktree의 <code>.git/worktrees/&lt;이름&gt;</code> 경로가 적혀 있고, git은 이 경로를 따라가 커밋을 찾는다. 기본은 <b>절대 경로</b>다. (<a href="https://git-scm.com/docs/git-worktree#_details">git-worktree: DETAILS</a>)</li>
+<li>커밋과 브랜치가 실제로 저장된 main worktree의 <code>.git</code> 폴더를 git 문서는 <b>common dir</b>(공통 폴더)라 부른다. 모든 worktree가 이 폴더 하나를 함께 쓴다. (같은 DETAILS 절)</li>
+<li><code>--relative-paths</code>를 주면 그 경로를 <b>상대 경로</b>로 적는다. (<a href="https://git-scm.com/docs/git-worktree">git-worktree</a>, <code>add</code>의 옵션) 같은 일을 하는 설정 <code>worktree.useRelativePaths</code>의 설명에는 "켜면 <code>extensions.relativeWorktrees</code>도 켜져 옛 git과 호환되지 않는다"고 적혀 있다. (같은 문서, CONFIGURATION 절) 옵션도 이것을 켜는지는 실습 1단계에서 확인한다. 켜진다면 그 값은 spring-backend도 쓰는 <code>projects/shop/.git/config</code>에 들어간다. 호스트 git은 2.55다.</li>
+</ul>
+<p>다른 저장소로 본 예시 (저장소 <code>blog</code>, 브랜치 <code>hotfix</code>):</p>
+<pre><code># main worktree 폴더로 간다
+cd C:\code\blog
+# 새 브랜치 hotfix를 만들어 ..\blog-hotfix 폴더로 꺼낸다
+git worktree add --relative-paths -b hotfix ..\blog-hotfix
+# 줄마다: 경로  커밋  [브랜치]
+git worktree list
+#   C:/code/blog         9f3c1a2 [main]
+#   C:/code/blog-hotfix  9f3c1a2 [hotfix]</code></pre>
+<p>오늘 worktree는 <code>--relative-paths</code>로 만든다. 왜 그래야 하는지는 실습 C에서 확인한다.</p>
+
+<h2>3. shop의 <code>devcontainer.json</code></h2>
+<p>출발점은 조사 문서(<code>docs/research/devcontainer-claude.md</code>)의 초안이다.</p>
+<pre><code>{
+  "name": "shop",
+  "image": "mcr.microsoft.com/devcontainers/java:25-trixie",
+  "remoteUser": "vscode",
+  "forwardPorts": [8080],
+  "mounts": [
+    "source=shop-gradle-home,target=/home/vscode/.gradle,type=volume"
+  ],
+  "postCreateCommand": "sudo chown -R vscode /home/vscode/.gradle",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-gradle",
+        "vmware.vscode-boot-dev-pack"
+      ]
+    }
+  }
+}</code></pre>
+<p>초안에서 고칠 것은 셋이다.</p>
+<table class="wrap">
+<tr><th>초안</th><th>오늘</th><th>이유</th></tr>
+<tr><td><code>"remoteUser": "vscode"</code></td><td>뺀다</td><td>6회차에 이미지 라벨 <code>devcontainer.metadata</code>에 <code>"remoteUser": "vscode"</code>가 이미 있는 것을 확인했고, 터미널의 <code>whoami</code>도 <code>vscode</code>였다</td></tr>
+<tr><td><code>"forwardPorts": [8080]</code></td><td><code>8081</code> + <code>containerEnv</code>의 <code>SERVER_PORT</code></td><td>8080은 spring-backend 트랙이 같은 shop을 호스트에서 띄울 때 쓴다. 이 트랙의 포트는 8081이다</td></tr>
+<tr><td><code>chown -R</code></td><td><code>-R</code> 없이</td><td>처음 만든 볼륨은 비어 있어서 폴더 하나만 바꾸면 된다. 6회차와 같은 명령</td></tr>
+</table>
+<p>이미지 태그 <code>25</code>와 <code>25-trixie</code>는 2026-10-16에 <code>docker buildx imagetools inspect</code>로 보니 같은 이미지(digest <code>sha256:da82e1…</code>)였다. 6회차에 받은 이미지를 그대로 쓴다. 초안의 <code>25-trixie</code>는 Debian 버전(trixie)이 태그에 드러나서 그대로 둔다. (<a href="https://github.com/devcontainers/images/tree/main/src/java">devcontainers/images: java</a>)</p>
+
+<h3>새로 쓰는 키 두 개</h3>
+<ul>
+<li><b><code>mounts</code></b>: 문자열 배열이다. 문자열 하나가 Docker CLI <code>--mount</code>의 값과 같은 문법이다. (<a href="https://containers.dev/implementors/json_reference/">devcontainer.json reference</a>) 쉼표로 <code>키=값</code>을 잇는다. <code>type</code>은 <code>volume</code>이나 <code>bind</code>, <code>source</code>는 볼륨 이름(bind면 호스트 경로), <code>target</code>은 컨테이너 안 경로다. 볼륨이 없으면 새로 만든다. (<a href="https://docs.docker.com/engine/storage/volumes/#options-for---mount">Volumes: --mount 옵션</a>) 6회차 Compose의 <code>gradle-cache:/home/vscode/.gradle</code>와 같은 일을 이미지 방식에서 한다.</li>
+<li><b><code>customizations.vscode.extensions</code></b>: 컨테이너가 만들어질 때 컨테이너 안에 설치할 확장 ID 목록이다. (<a href="https://code.visualstudio.com/docs/devcontainers/containers#_managing-extensions">Managing extensions</a>) <code>customizations</code> 아래 도구 이름(<code>vscode</code>)으로 한 번 더 묶는다.</li>
+</ul>
+
+<h3>예시 (오늘 과제와 다른 Python 앱)</h3>
+<pre><code>{
+  "name": "flask-demo",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "mounts": [
+    "source=flask-pip-cache,target=/home/vscode/.cache/pip,type=volume"
+  ],                                   // 볼륨 flask-pip-cache를 pip 캐시 폴더에
+  "customizations": {
+    "vscode": {                        // 도구 이름으로 한 번 더 묶는다
+      "extensions": ["ms-python.python"]   // 컨테이너 안에 설치할 확장
+    }
+  }
+}</code></pre>
+<p class="muted">주석(<code>//</code>)은 설명용이다. 오늘 파일에는 쓰지 않는다.</p>
+
+<h2>4. 오늘 쓰는 명령</h2>
+<table>
+<tr><th>명령</th><th>하는 일</th></tr>
+<tr><td><code>git branch</code></td><td>브랜치 목록. 지금 브랜치에 <code>*</code>, 다른 worktree에 꺼내진 브랜치에 <code>+</code>가 붙는다. (<a href="https://git-scm.com/docs/git-branch">git-branch</a>)</td></tr>
+<tr><td><code>git worktree add</code></td><td><code>--relative-paths -b 새브랜치 경로</code>: 지금 HEAD에서 새 브랜치를 만들고, 그 브랜치를 꺼낸 새 작업 폴더를 경로에 만든다. <code>.git</code> 파일에는 상대 경로를 적는다. (<a href="https://git-scm.com/docs/git-worktree">git-worktree</a>)</td></tr>
+<tr><td><code>git worktree list</code></td><td>worktree 목록. main이 먼저, 줄마다 경로·커밋·브랜치. (같은 문서)</td></tr>
+<tr><td><code>git switch 브랜치</code></td><td>지금 폴더를 그 브랜치로 바꾼다. (<a href="https://git-scm.com/docs/git-switch">git-switch</a>)</td></tr>
+<tr><td><code>Get-Content 파일</code></td><td>파일 내용 출력 (PowerShell). <a href="https://learn.microsoft.com/powershell/module/microsoft.powershell.management/get-content">docs</a></td></tr>
+<tr><td><code>./gradlew build</code></td><td>컴파일, 테스트, jar 만들기를 한 번에 한다. (<a href="https://docs.gradle.org/current/userguide/java_plugin.html">Java plugin: build</a>)</td></tr>
+<tr><td><code>git status</code></td><td>지금 브랜치와 바뀐·새 파일. (<a href="https://git-scm.com/docs/git-status">git-status</a>)</td></tr>
+<tr><td><code>git add</code> / <code>commit</code></td><td>커밋할 파일을 고른다(<code>add 파일</code>). 고른 파일로 커밋을 만든다(<code>commit -m "메시지"</code>). 이미 써 본 명령</td></tr>
+<tr><td><code>git log --oneline -n 2 브랜치</code></td><td>그 브랜치의 최근 커밋 2개를 한 줄씩. (<a href="https://git-scm.com/docs/git-log">git-log</a>)</td></tr>
+<tr><td><code>git -C 폴더 …</code></td><td>그 폴더에서 친 것처럼 git을 실행한다. <code>cd</code> 없이 쓴다. (<a href="https://git-scm.com/docs/git#Documentation/git.txt--Cpath">git -C</a>)</td></tr>
+<tr><td><code>git config 키</code></td><td>그 설정의 값을 읽는다. 없으면 아무것도 출력하지 않는다. (<a href="https://git-scm.com/docs/git-config">git-config</a>)</td></tr>
+<tr><td><code>docker rm -f 이름</code></td><td>실행 중이어도 끝내고 지운다. 1회차 명령</td></tr>
+</table>
+
+<h2>5. 실습 — 예측하고 직접 친다</h2>
+<div class="note">6회차처럼 창이 두 개다. <b>Claude 창</b>(<code>E:\Study\Inflearn</code>, 터미널 이름 <code>lab</code>)은 호스트에 둔다. <b>실습 창</b>은 오늘 만드는 <code>projects/shop-docker-devcontainer</code>만 연 새 창이고, 이것만 컨테이너로 연다. 실습 창 터미널 출력은 복사해서 붙여 넣는다. <code>projects/shop</code> 폴더는 spring-backend 트랙의 것이라 오늘 그 안의 파일을 고치지 않는다.</div>
+
+<h3>A. worktree 만들기</h3>
+<ol class="steps">
+<li>
+<p>Claude 창의 <code>lab</code> 터미널(PowerShell)에서 shop 폴더로 가서 브랜치 목록을 본다.</p>
+<pre><code>cd E:\Study\Inflearn\projects\shop
+git branch</code></pre>
+<p>이어서 worktree를 만든다. 경로 <code>..\shop-docker-devcontainer</code>는 shop 폴더 기준 한 단계 위, 즉 <code>projects\shop-docker-devcontainer</code>다. 줄 끝의 백틱(<code>`</code>)은 PowerShell에서 다음 줄로 이어 쓴다는 뜻이다.</p>
+<pre><code>git worktree add --relative-paths `
+  -b docker-devcontainer ..\shop-docker-devcontainer
+git worktree list
+git branch</code></pre>
+<div class="predict"><code>git worktree list</code>는 몇 줄이고, 줄마다 어떤 브랜치가 보일까? 두 줄의 커밋 ID는 같을까, 다를까? 두 번째 <code>git branch</code>에서 <code>docker-devcontainer</code> 앞에는 무엇이 붙을까?</div>
+<p>2절의 확인 거리: 저장소 설정에 <code>extensions.relativeWorktrees</code>가 켜졌는지 읽는다. <code>true</code>가 나오면 켜진 것이다.</p>
+<pre><code>git config extensions.relativeWorktrees</code></pre>
+</li>
+<li>
+<p>새 폴더의 <code>.git</code>을 읽는다.</p>
+<pre><code>Get-Content ..\shop-docker-devcontainer\.git</code></pre>
+<div class="predict">오류가 날까(폴더라서), 한 줄이 나올까? 한 줄이라면 어떤 경로가 어떤 꼴(절대·상대)로 적혀 있을까?</div>
+</li>
+<li>
+<p>shop 폴더(main worktree)를 새 브랜치로 바꿔 본다.</p>
+<pre><code>git switch docker-devcontainer</code></pre>
+<div class="predict">바뀔까? 아니면 무슨 메시지가 나올까?</div>
+<p>마지막에 <code>git branch</code>로 shop 폴더가 여전히 <code>master</code>인지 확인한다.</p>
+</li>
+</ol>
+
+<h3>B. 컨테이너로 열고 빌드</h3>
+<ol class="steps" start="4">
+<li>
+<p>worktree를 새 창(실습 창)으로 연다.</p>
+<pre><code>code -n E:\Study\Inflearn\projects\shop-docker-devcontainer</code></pre>
+<p>실습 창에서 <code>.devcontainer/devcontainer.json</code>을 <b>직접 쓴다</b>. 3절 예시의 꼴을 따른다. 조건:</p>
+<table class="wrap">
+<tr><th>키</th><th>값</th></tr>
+<tr><td><code>name</code></td><td><code>shop</code></td></tr>
+<tr><td><code>image</code></td><td><code>mcr.microsoft.com/devcontainers/java:25-trixie</code></td></tr>
+<tr><td><code>forwardPorts</code></td><td><code>8081</code> 하나</td></tr>
+<tr><td><code>containerEnv</code></td><td><code>SERVER_PORT</code> = <code>"8081"</code> (문자열)</td></tr>
+<tr><td><code>mounts</code></td><td>문자열 하나: 볼륨 <code>shop-gradle-home</code>을 <code>/home/vscode/.gradle</code>에 (<code>type=volume</code>)</td></tr>
+<tr><td><code>postCreateCommand</code></td><td><code>sudo chown vscode /home/vscode/.gradle</code></td></tr>
+<tr><td><code>customizations</code> › <code>vscode</code> › <code>extensions</code></td><td>아래 확장 ID 3개</td></tr>
+</table>
+<pre><code>vscjava.vscode-java-pack
+vscjava.vscode-gradle
+vmware.vscode-boot-dev-pack</code></pre>
+<p class="muted">마켓플레이스: <a href="https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack">Extension Pack for Java</a>, <a href="https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-gradle">Gradle for Java</a>, <a href="https://marketplace.visualstudio.com/items?itemName=vmware.vscode-boot-dev-pack">Spring Boot Extension Pack</a></p>
+<p><b>리뷰 받기 전 이름 대조</b> (6회차 오타 3건이 모두 이 종류였다):</p>
+<ul>
+<li><code>mounts</code>의 <code>target</code> 경로와 <code>postCreateCommand</code>의 경로가 글자 하나까지 같은가</li>
+<li><code>forwardPorts</code>의 숫자와 <code>SERVER_PORT</code>의 값이 같은가</li>
+<li>파일 이름이 <code>devcontainer.json</code>이고 폴더가 <code>.devcontainer</code>(점으로 시작)인가</li>
+<li>마지막 항목 뒤에 쉼표가 없는가</li>
+</ul>
+<p>다 쓰면 Claude에게 리뷰를 받는다. 이 파일은 아직 커밋하지 않는다.</p>
+</li>
+<li>
+<p>8081을 미리 막아 둔다. Claude 창 <code>lab</code> 터미널에서 nginx를 호스트 8081에 publish한다(이미지가 없으면 받는다).</p>
+<pre><code>docker run -d --name port-block -p 8081:80 nginx</code></pre>
+<p>실습 창에서 F1 → <b>Dev Containers: Reopen in Container</b>. 끝나면 Claude가 <code>docker inspect</code>로 이 컨테이너의 마운트 목록을 읽는다.</p>
+<div class="predict">bind mount로 들어온 호스트 폴더는 무엇일까? <code>projects\shop-docker-devcontainer</code> 하나일까, <code>projects\shop</code>도 들어올까? 볼륨은 어떤 이름들이 붙을까?</div>
+</li>
+<li>
+<p>실습 창 터미널(Ctrl+`)에서 빌드한다.</p>
+<pre><code>./gradlew build</code></pre>
+<div class="predict">Gradle 배포판을 내려받을까? 6회차 docker-lab에서 받은 것을 쓸 수 있을까? <code>BUILD SUCCESSFUL</code>이 나올까? (shop에는 DB 설정이 없고, 테스트는 앱이 뜨는지만 본다)</div>
+</li>
+<li>
+<p>앱을 실행하고, 실습 창 아래 패널의 <b>Ports</b> 탭을 연다.</p>
+<pre><code>./gradlew bootRun</code></pre>
+<p>근거: forward는 VS Code가 자기 연결로 컨테이너 포트를 로컬 포트에 전달하는 것이다. devcontainer.json 스펙에는 "<code>requireLocalPort</code>가 <code>false</code>(기본값)면 같은 로컬 포트를 먼저 시도하고, 쓸 수 없으면 알리지 않고 다른 포트에 연결한다"고 적혀 있다. (<a href="https://containers.dev/implementors/json_reference/#port-attributes">Port attributes</a>) VS Code 문서에서는 이 동작을 찾지 못했다. 그래서 실측한다.</p>
+<div class="predict">호스트 8081은 nginx가 쓰고 있다. Ports 탭의 "Forwarded Address"는 <code>localhost:8081</code>일까, 다른 포트일까, 오류가 날까? 브라우저에는 shop과 nginx 중 무엇이 보일까?</div>
+<p>보이는 주소를 통합 브라우저로 열어 본다. 확인한 뒤 Ctrl+C로 앱을 멈추고, Claude 창에서 nginx를 지운다.</p>
+<pre><code>docker rm -f port-block</code></pre>
+</li>
+</ol>
+
+<h3>C. 컨테이너 안의 git</h3>
+<ol class="steps" start="8">
+<li>
+<p>실습 창 터미널에서 git 버전과 상태를 본다.</p>
+<pre><code>git --version
+git status</code></pre>
+<div class="predict">2단계에서 본 <code>.git</code> 파일의 경로를 5단계의 마운트 목록과 비교해 보자. 컨테이너 안에서 그 경로를 따라가면 무엇이 있을까? <code>git status</code>는 브랜치 이름을 보여 줄까, 오류를 낼까?</div>
+<p><code>git --version</code>은 기록해 둔다. 9단계에서 이 git이 상대 경로 worktree(<code>extensions.relativeWorktrees</code>)를 읽는지가 드러난다.</p>
+</li>
+<li>
+<p>Dev Containers 확장에는 이 문제를 위한 실험 설정이 있다. 설정 화면의 설명은 "컨테이너 안에서 git이 동작하도록 worktree의 공통 폴더를 마운트한다. worktree를 <code>--relative-paths</code>로 만들어야 한다"이다. 기본값은 꺼짐이고, 프로젝트가 아니라 사용자 설정에만 들어간다. (Dev Containers v0.469.0의 설정 설명. 관련 이슈 <a href="https://github.com/microsoft/vscode-remote-release/issues/11478">#11478</a>) 공식 문서 페이지는 아직 찾지 못했다.</p>
+<p>F1 → <b>Preferences: Open User Settings</b> → 검색창에 <code>experimentalMountGitWorktreeCommonDir</code> → 체크한다. 그다음 F1 → <b>Dev Containers: Rebuild Container</b>. 끝나면 Claude가 마운트 목록을 다시 읽는다.</p>
+<div class="predict">마운트 목록에 무엇이 하나 더 생길까? (2절의 common dir를 떠올린다) 다시 친 <code>git status</code>는 무엇을 보여 줄까? 이어서 친 <code>./gradlew build</code>는 Gradle을 다시 내려받을까?</div>
+<p><b>멈춤 조건</b>: 새 마운트의 호스트 경로가 <code>projects\shop</code> 밖(예: <code>E:\Study\Inflearn</code>)이면 다음으로 가지 않는다. 컨테이너에는 프로젝트 폴더만 넣는다는 이 트랙의 규칙 때문이다(<code>courses/</code>가 보이면 안 된다).</p>
+<pre><code>git status
+./gradlew build</code></pre>
+<p><code>detected dubious ownership</code>이라는 메시지가 나오면 그대로 Claude에게 붙여 넣는다. 이 경고가 나오는지는 문서에서 확인하지 못해 오늘 실측한다.</p>
+</li>
+<li>
+<p>컨테이너 터미널에서 설정 파일을 커밋한다.</p>
+<pre><code>git add .devcontainer/devcontainer.json
+git commit -m "dev container 설정 추가"</code></pre>
+<p>Claude 창 <code>lab</code> 터미널(호스트)에서 두 브랜치를 본다. <code>-C 폴더</code>는 그 폴더에서 친 것처럼 git을 실행한다.</p>
+<pre><code>git -C E:\Study\Inflearn\projects\shop log --oneline -n 2 docker-devcontainer
+git -C E:\Study\Inflearn\projects\shop log --oneline -n 2 master</code></pre>
+<div class="predict">컨테이너에서 만든 커밋이 호스트의 shop 폴더에서도 보일까? <code>master</code>의 맨 위 커밋은 바뀌었을까? (1절: 새 커밋은 지금 브랜치만 옮긴다)</div>
+</li>
+<li>
+<p>실습 창을 닫는다. worktree, 브랜치, 볼륨 <code>shop-gradle-home</code>은 8회차에 계속 쓴다.</p>
+</li>
+</ol>
+
+<div class="note"><b>실습에서 드러난 것 (2026-10-16).</b> 9단계 뒤 컨테이너 <code>git status</code>에 고치지 않은 파일 9개가 <code>modified</code>로 나왔다. 호스트의 <code>core.autocrlf=true</code>는 Git for Windows 시스템 설정(<code>C:/Program Files/Git/etc/gitconfig</code>)에 있어 컨테이너로 복사되지 않는다. 작업 파일은 CRLF, 저장소는 LF라서 컨테이너 git만 다르다고 본다. <code>.gitattributes</code> 맨 위에 <code>* text=auto eol=lf</code>를 넣어 해결했고, 10단계에서 두 파일을 함께 커밋했다. (<a href="https://code.visualstudio.com/docs/devcontainers/tips-and-tricks#_resolving-git-line-ending-issues-in-containers-resulting-in-many-modified-files">Resolving Git line ending issues in containers</a>)</div>
+
+<h2>6. 남겨 둘 것과 다음</h2>
+<ul>
+<li>남긴다: worktree <code>projects/shop-docker-devcontainer</code>, 브랜치 <code>docker-devcontainer</code>, 볼륨 <code>shop-gradle-home</code>, 사용자 설정 <code>experimentalMountGitWorktreeCommonDir</code>.</li>
+<li><code>master</code> 병합은 spring-backend 강의 세션이 돌고 있지 않을 때 따로 한다.</li>
+<li>8회차에는 이 컨테이너에 Claude Code를 넣는다.</li>
+</ul>
+<p class="muted">실무에서는 dev container 설정을 브랜치에서 만들고 리뷰(PR)를 거쳐 기본 브랜치에 합친다. 오늘은 리뷰를 Claude와 채팅으로 한다.</p>
+
+<h2>더 읽을 것</h2>
+<p>1차 자료: <a href="https://git-scm.com/docs/git-worktree">git-worktree</a>. 맨 위 DESCRIPTION과 DETAILS를 읽는다. 브랜치가 처음이면 먼저 <a href="https://git-scm.com/book/en/v2/Git-Branching-Branches-in-a-Nutshell">Pro Git: Branches in a Nutshell</a>의 그림을 본다.</p>
+
+<div class="note">막히거나 출력이 예측과 다르면 출력을 붙여 넣고 물어보세요. Claude가 이 과정의 선생님입니다.</div>
+
+<nav class="lesson-nav">
+<a href="0007-dev-container-basics.html">← 6회차 · Dev Container 기초</a>
+<a href="../reference/glossary.html">용어집 →</a>
+</nav>
+
+</main>
+</body>
+</html>

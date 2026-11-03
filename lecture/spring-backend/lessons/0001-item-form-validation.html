@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>상품 폼과 검증</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>1회차 · 상품 폼과 검증</h1>
+<p class="subtitle">스프링 MVC 2편 2~5장 리마인드 · Spring Boot 4.1.1 · 용어는 <a href="../reference/glossary.html">용어집</a>, 한 장 요약은 <a href="../reference/form-validation.html">폼·검증 요약</a></p>
+
+<p><strong>오늘의 결과물.</strong> <code>shop</code>에 상품 목록·상세·등록·수정 화면이 생긴다. 잘못 입력하면 입력값이 그대로 남은 채 빨간 오류 메시지가 뜨고, 저장한 뒤 새로고침해도 상품이 한 번만 저장된다.</p>
+<p class="muted">진단에서 막힌 네 가지(PRG, <code>th:field</code>, <code>BindingResult</code>, 폼 객체 분리)만 다룬다. 면접에서는 각 항목의 "왜?"를 묻는다.</p>
+
+<h2 id="prg">1. PRG: 저장 후에는 리다이렉트한다</h2>
+<p><strong>문제.</strong> POST로 저장한 뒤 컨트롤러가 상세 뷰를 바로 반환하면, 브라우저의 마지막 요청은 그 POST로 남는다. 이 화면에서 새로고침(F5)을 하면 브라우저는 마지막 요청인 POST를 폼 데이터와 함께 <strong>다시 전송</strong>하고, 상품이 또 저장된다 (<a href="https://en.wikipedia.org/wiki/Post/Redirect/Get">Wikipedia: Post/Redirect/Get</a>).</p>
+<p><strong>해결.</strong> POST를 처리한 뒤 뷰를 그리지 않고 리다이렉트로 응답한다. 브라우저는 상세 페이지를 GET으로 새로 요청하고, 이제 마지막 요청은 GET이다. 새로고침하면 그 GET만 다시 보낸다. 이것이 PRG(Post/Redirect/Get)다.</p>
+<figure>
+<svg viewBox="0 0 640 120" role="img" aria-label="POST 저장, 리다이렉트 응답, GET 상세 순서">
+  <rect class="box" x="10" y="35" width="150" height="50" rx="4"/>
+  <text x="85" y="58" text-anchor="middle">POST /items/add</text>
+  <text x="85" y="76" text-anchor="middle" font-size="13">저장</text>
+  <rect class="box-accent" x="245" y="35" width="150" height="50" rx="4"/>
+  <text x="320" y="58" text-anchor="middle">리다이렉트 응답</text>
+  <text x="320" y="76" text-anchor="middle" font-size="13">/items/1?status=true</text>
+  <rect class="box" x="480" y="35" width="150" height="50" rx="4"/>
+  <text x="555" y="58" text-anchor="middle">GET /items/1</text>
+  <text x="555" y="76" text-anchor="middle" font-size="13">F5는 여기만 반복</text>
+  <path class="arrow" d="M160 60 H240 M232 54 L240 60 L232 66"/>
+  <path class="arrow" d="M395 60 H475 M467 54 L475 60 L467 66"/>
+</svg>
+<figcaption>저장은 POST 한 번. 새로고침은 마지막 요청인 GET만 다시 보낸다.</figcaption>
+</figure>
+<p><strong>메시지 전달.</strong> 리다이렉트하면 모델이 사라지므로 "저장되었습니다"를 URL에 실어 보낸다. <code>RedirectAttributes</code>의 <code>addAttribute</code>로 넣은 값은 리다이렉트 URL의 <code>{이름}</code> 자리를 채우고, 남은 값은 <a href="../reference/glossary.html#query-param">쿼리 파라미터</a>로 붙는다 (교재 4장 129–133줄의 코드). 공식 문서는 "모델 속성은 리다이렉트 URL의 URI 템플릿 변수로 쓰이고, 남은 기본 타입 속성은 쿼리 파라미터로 붙는다"고 설명한다 (<a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/redirecting-passing-data.html">Spring: Redirect Attributes</a>).</p>
+<pre><code>redirectAttributes.addAttribute("itemId", 1L);    // {itemId} 자리에 1
+redirectAttributes.addAttribute("status", true);  // 자리가 없으니 ?status=true
+return "redirect:/items/{itemId}";               // → /items/1?status=true</code></pre>
+<p>상세 템플릿은 <code>&lt;h2 th:if="${param.status}" th:text="'저장 완료'"&gt;&lt;/h2&gt;</code>로 쿼리 파라미터를 읽는다 (교재 3장 534줄).</p>
+<p>현재 요청 URL의 경로 변수는 따로 넣지 않아도 리다이렉트 URL에 쓸 수 있다. 그래서 수정 처리(<code>POST /items/{itemId}/edit</code>)는 <code>return "redirect:/items/{itemId}";</code>만 써도 된다 (같은 공식 문서).</p>
+
+<h2 id="th-field">2. <code>th:field</code>가 만드는 것</h2>
+<p><code>th:object="${item}"</code>로 폼의 <a href="../reference/glossary.html#command-object">커맨드 객체</a>를 고르면, 폼 안에서 <a href="../reference/glossary.html#selection-expr">선택 변수 식</a> <code>*{필드}</code>로 그 객체의 필드를 가리킨다. <code>th:field</code>는 그 필드 이름과 값으로 HTML 속성 세 개를 만든다 (교재 2장 84–142줄, <a href="https://www.thymeleaf.org/doc/tutorials/3.1/thymeleafspring.html#inputs">Thymeleaf + Spring 6.2 Inputs</a>).</p>
+<pre><code>&lt;!-- 템플릿 --&gt;
+&lt;input type="text" th:field="*{itemName}"&gt;
+&lt;!-- 렌더링 결과: 이름이 같은 id·name, 그리고 현재 값 --&gt;
+&lt;input type="text" id="itemName" name="itemName" value="상품A"&gt;</code></pre>
+<ul>
+<li><code>name</code>: 제출할 때 요청 파라미터 이름이 된다. 그래서 <code>@ModelAttribute</code>가 같은 이름의 필드에 값을 넣는다.</li>
+<li><code>value</code>: 등록 폼(빈 객체)이면 <code>value=""</code>. 검증에 실패해 폼을 다시 그리면 사용자가 입력했던 값이 들어간다(3절의 <code>rejectedValue</code>).</li>
+</ul>
+<p>오류 표시용 속성 두 개 (교재 4장 509–511줄. <code>th:errorclass</code>는 <a href="https://www.thymeleaf.org/doc/tutorials/3.1/thymeleafspring.html#field-errors">Thymeleaf + Spring 7.1 Field errors</a>에도 있다):</p>
+<table>
+<thead><tr><th>속성</th><th>동작</th></tr></thead>
+<tbody>
+<tr><td><code>th:errors="*{price}"</code></td><td><code>price</code>에 오류가 있을 때만 태그를 그리고, 오류 메시지를 넣는다.</td></tr>
+<tr><td><code>th:errorclass="field-error"</code></td><td>같은 태그의 <code>th:field</code> 필드에 오류가 있을 때만 <code>class</code>에 <code>field-error</code>를 덧붙인다.</td></tr>
+</tbody>
+</table>
+
+<h2 id="binding-result">3. <code>BindingResult</code>: 오류가 나도 컨트롤러까지 온다</h2>
+<p><code>BindingResult</code>는 <a href="../reference/glossary.html#binding">바인딩</a>·검증 오류를 담는 객체다. <strong>검증할 <code>@ModelAttribute</code> 파라미터 바로 다음</strong>에 둔다. 그 위치로 어떤 객체의 오류인지 안다 (교재 4장 555줄).</p>
+<table class="wrap">
+<thead><tr><th>가격 칸에 <code>abc</code>를 제출했을 때</th><th>결과</th></tr></thead>
+<tbody>
+<tr><td><code>BindingResult</code> 있음</td><td>컨트롤러가 정상 호출된다. 스프링이 <code>price</code>에 <code>typeMismatch</code> <code>FieldError</code>를 만들어 담는다. 이 <code>FieldError</code>는 입력값 <code>abc</code>(<code>rejectedValue</code>)도 보관한다 (교재 4장 536–545, 661줄).</td></tr>
+<tr><td><code>BindingResult</code> 없음</td><td>컨트롤러가 호출되지 않고 400 오류 페이지가 뜬다 (교재 4장 540줄). 공식 문서: <code>BindingResult</code>가 없으면 예외가 발생한다 (<a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/modelattrib-method-args.html">Spring: @ModelAttribute</a>).</td></tr>
+</tbody>
+</table>
+<p><strong>검증 순서.</strong> ① 각 필드의 타입 변환 → 실패한 필드는 <code>typeMismatch</code> 추가. ② 변환에 성공한 필드에만 Bean Validation 적용. 변환에 실패한 필드에 <code>@NotNull</code> 같은 검사는 돌지 않는다 (교재 5장 385–408줄). 공식 문서에서는 이 순서를 찾지 못했으니 8절 2단계에서 직접 확인한다.</p>
+<p><code>BindingResult</code>는 모델에도 자동으로 담긴다(교재 4장 556줄). 그래서 오류가 있을 때 리다이렉트하지 않고 폼 뷰 이름을 그대로 반환하면, 템플릿이 입력값과 오류를 함께 그린다.</p>
+
+<h2 id="form-object">4. 등록·수정 폼 객체를 나누는 이유</h2>
+<p>교재(5장 825–891줄)의 이유는 "문법이 간단해서"가 아니다. <strong>받는 데이터와 검증 규칙이 다르기 때문</strong>이다.</p>
+<ul>
+<li>실무 폼은 도메인 객체와 딱 맞지 않는다. 약관 동의처럼 <code>Item</code>에 없는 데이터가 넘어오고, 등록과 수정은 받는 범위도 다르다(예: 회원 가입에만 로그인 ID).</li>
+<li><code>Item</code> 하나로 받으면 등록·수정 규칙을 한 클래스에 섞어야 하고, 이를 구분하려면 <code>groups</code>가 필요하다. <code>groups</code>를 쓰면 <code>Item</code>과 코드 전반의 복잡도가 올라간다.</li>
+<li><code>ItemSaveForm</code>·<code>ItemUpdateForm</code>으로 나누면 각자 자기 규칙만 가진다. 등록·수정이 완전히 분리되니 <code>groups</code>를 쓸 일이 드물다.</li>
+<li>대가: 컨트롤러에서 폼 객체 → <code>Item</code>으로 옮기는 코드가 생긴다.</li>
+</ul>
+<p>흐름: <code>HTML 폼 → ItemSaveForm → 컨트롤러 → Item 생성 → 저장소</code></p>
+
+<h2 id="boot4">5. Boot 4.1 차이</h2>
+<ul>
+<li><code>javax.*</code> 대신 <code>jakarta.*</code>. <code>@NotBlank</code>·<code>@NotNull</code>·<code>@Max</code>는 <code>jakarta.validation.constraints</code>에서 import한다.</li>
+<li>Hibernate Validator 9에서 <code>org.hibernate.validator.constraints</code>의 <code>@NotBlank</code>·<code>@NotEmpty</code>·<code>@Email</code>은 삭제됐다. 삭제 목록은 <a href="https://hibernate.org/validator/documentation/migration-guide/">HV Migration Guide</a>에 있다. <code>@Range</code>는 HV 9.1 API 문서에 deprecated 표시 없이 그대로 있다 (<a href="https://docs.hibernate.org/validator/9.1/api/org/hibernate/validator/constraints/Range.html">Range API</a>).</li>
+</ul>
+
+<h2 id="api">6. 오늘 쓰는 API</h2>
+<table class="wrap">
+<thead><tr><th>이름</th><th>한 줄 설명</th></tr></thead>
+<tbody>
+<tr><td><code>@Validated</code></td><td>이 파라미터를 바인딩한 뒤 Bean Validation을 실행한다. <code>org.springframework.validation.annotation</code> (<a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/validation/annotation/Validated.html">API</a>).</td></tr>
+<tr><td><code>@ModelAttribute("item")</code></td><td>요청 파라미터를 객체에 바인딩하고, 모델에 <code>item</code>이라는 이름으로 담는다. 이름을 빼면 <code>ItemSaveForm</code>은 <code>itemSaveForm</code>으로 담겨 템플릿의 <code>${item}</code>과 어긋난다 (교재 5장 1108줄).</td></tr>
+<tr><td><code>BindingResult</code></td><td><code>hasErrors()</code>로 오류가 있는지 확인한다.</td></tr>
+<tr><td><code>RedirectAttributes</code></td><td><code>addAttribute(이름, 값)</code>으로 리다이렉트 URL에 값을 싣는다.</td></tr>
+<tr><td><code>@NotBlank</code></td><td>문자열이 null·빈 문자열·공백만이면 오류. 아래 제약 애너테이션 넷의 공식 설명은 <a href="https://docs.hibernate.org/validator/9.1/reference/en-US/html_single/#section-builtin-constraints">HV 9.1 레퍼런스 2.3 Built-in constraints</a>.</td></tr>
+<tr><td><code>@NotNull</code></td><td>null이면 오류. 숫자 칸을 비워 제출하면 null이 된다.</td></tr>
+<tr><td><code>@Range(min, max)</code></td><td>숫자가 min~max(양 끝 포함) 밖이면 오류.</td></tr>
+<tr><td><code>@Max(value)</code></td><td>숫자가 값보다 크면 오류.</td></tr>
+</tbody>
+</table>
+
+<h3>예시: 과제와 다른 도메인(회원 가입)</h3>
+<pre><code>@Data                                   // Lombok: getter·setter·기본 생성자 등
+public class MemberJoinForm {
+    @NotBlank                           // jakarta.validation.constraints.NotBlank
+    private String loginId;
+    @NotNull @Range(min = 14, max = 120) // 비우면 @NotNull, 범위 밖이면 @Range 오류
+    private Integer age;
+}
+
+@PostMapping("/members/join")
+public String join(@Validated @ModelAttribute("member") MemberJoinForm form, // 바인딩 + 검증, 모델 키 "member"
+                   BindingResult bindingResult,                            // 바로 앞 파라미터의 오류
+                   RedirectAttributes redirectAttributes) {
+    if (bindingResult.hasErrors()) {
+        return "members/joinForm";       // 리다이렉트 없이 폼을 다시 그린다(입력값·오류 유지)
+    }
+    Member saved = memberRepository.save(new Member(form.getLoginId(), form.getAge())); // 폼 → 도메인
+    redirectAttributes.addAttribute("memberId", saved.getId()); // {memberId} 자리
+    redirectAttributes.addAttribute("joined", true);            // ?joined=true
+    return "redirect:/members/{memberId}";                      // PRG
+}</code></pre>
+
+<h2 id="task">7. 과제: <code>shop</code>에 상품 관리 만들기</h2>
+<p>Java 코드는 직접 쓴다. 템플릿·CSS·메시지 파일은 교재 예제에서 복사한다. 베이스 패키지는 <code>com.study.shop</code>이다. 원본 경로는 저장소 루트(<code>E:\Study\Inflearn</code>) 기준, shop의 위치는 <code>projects/shop</code> 기준이다.</p>
+
+<h3>복사할 파일</h3>
+<p>원본 폴더: <code>courses/spring-mvc2/code/validation/src/main/resources/</code></p>
+<table class="wrap">
+<thead><tr><th>원본</th><th>shop의 위치</th></tr></thead>
+<tbody>
+<tr><td><code>templates/validation/v4/</code>의 html 4개</td><td><code>src/main/resources/templates/items/</code></td></tr>
+<tr><td><code>static/css/bootstrap.min.css</code></td><td><code>src/main/resources/static/css/</code></td></tr>
+<tr><td><code>messages.properties</code></td><td><code>src/main/resources/</code></td></tr>
+</tbody>
+</table>
+<p>복사는 <strong>호스트 창</strong>(루트 <code>E:\Study\Inflearn</code>)의 탐색기에서 한다. 컨테이너 창에는 <code>courses/</code>가 보이지 않는다.</p>
+<p>그다음 <strong>컨테이너 창</strong>에서 Ctrl+Shift+H(전체 찾기·바꾸기)를 열고, "포함할 파일"에 <code>src/main/resources/templates/items</code>를 넣은 뒤 <code>/validation/v4/items</code>를 모두 <code>/items</code>로 바꾼다. 호스트 창에서 하면 교재 예제 코드까지 바뀐다.</p>
+<p>템플릿의 <code>#{page.items}</code> 같은 표현은 <code>messages.properties</code>에서 같은 키의 문구를 읽는다. 스프링 부트는 기본으로 <code>messages.properties</code>를 메시지 파일로 쓴다 (<a href="https://docs.spring.io/spring-boot/reference/features/internationalization.html">Boot: Internationalization</a>).</p>
+<pre><code># 한 줄에 키=문구 하나
+page.items=상품 목록
+button.save=저장
+# 템플릿의 #{page.items} 자리에 "상품 목록"이 들어간다</code></pre>
+
+<h3>만들 클래스</h3>
+<table class="wrap">
+<thead><tr><th>클래스</th><th>요구 사항</th></tr></thead>
+<tbody>
+<tr><td><code>domain.item.Item</code></td><td><code>@Data</code>. 필드 <code>Long id</code>, <code>String itemName</code>, <code>Integer price</code>, <code>Integer quantity</code>.</td></tr>
+<tr><td><code>domain.item.ItemRepository</code></td><td><code>@Repository</code>. 메모리 저장(<code>Map&lt;Long, Item&gt;</code>와 증가하는 <code>long</code> 순번). 메서드 <code>Item save(Item)</code>(id를 부여하고 그 <code>Item</code>을 반환), <code>Item findById(Long)</code>(없으면 <code>null</code>),<code>findAll()</code>(<code>List&lt;Item&gt;</code>), <code>update(Long itemId, Item updateParam)</code>(이름·가격·수량을 덮어씀).</td></tr>
+<tr><td><code>web.item.form.ItemSaveForm</code></td><td><code>@Data</code>. <code>itemName</code>: <code>@NotBlank</code>. <code>price</code>: <code>@NotNull</code>, <code>@Range(min = 1000, max = 1000000)</code>. <code>quantity</code>: <code>@NotNull</code>, <code>@Max(9999)</code>. <code>id</code> 필드는 없다.</td></tr>
+<tr><td><code>web.item.form.ItemUpdateForm</code></td><td><code>@Data</code>. <code>id</code>: <code>@NotNull</code>. <code>itemName</code>: <code>@NotBlank</code>. <code>price</code>: <code>@NotNull</code>, <code>@Range(min = 1000, max = 1000000)</code>. <code>quantity</code>: 제약 없음(수정 때는 자유).</td></tr>
+<tr><td><code>web.item.ItemController</code></td><td><code>@Controller</code>, <code>@RequestMapping("/items")</code>, 저장소는 생성자 주입. 아래 표의 6개 메서드.</td></tr>
+</tbody>
+</table>
+
+<table class="wrap">
+<thead><tr><th>요청</th><th>처리</th></tr></thead>
+<tbody>
+<tr><td><code>GET /items</code></td><td>모델 <code>items</code>에 전체 목록 → 뷰 <code>items/items</code></td></tr>
+<tr><td><code>GET /items/{itemId}</code></td><td>모델 <code>item</code>에 상품 → 뷰 <code>items/item</code></td></tr>
+<tr><td><code>GET /items/add</code></td><td>모델 <code>item</code>에 <code>new Item()</code> → 뷰 <code>items/addForm</code></td></tr>
+<tr><td><code>POST /items/add</code></td><td><code>ItemSaveForm</code>을 검증. 오류면 뷰 <code>items/addForm</code>. 성공이면 <code>Item</code>을 만들어 저장하고 <code>/items/{itemId}?status=true</code>로 리다이렉트.</td></tr>
+<tr><td><code>GET /items/{itemId}/edit</code></td><td>모델 <code>item</code>에 상품 → 뷰 <code>items/editForm</code></td></tr>
+<tr><td><code>POST /items/{itemId}/edit</code></td><td><code>ItemUpdateForm</code>을 검증. 오류면 뷰 <code>items/editForm</code>. 성공이면 이름·가격·수량을 수정하고 <code>/items/{itemId}</code>로 리다이렉트.</td></tr>
+</tbody>
+</table>
+<p>템플릿은 폼 객체를 <code>${item}</code>으로 읽는다. 두 POST 메서드의 폼 파라미터에 모델 이름 <code>item</code>을 지정한다.</p>
+
+<h2 id="check">8. 실행하고 확인하기</h2>
+<p><strong>먼저 확인할 것.</strong> shop 컨테이너 창이 열려 있고, 그 창에서 <code>./gradlew build</code>가 통과했다. 8081을 쓰는 다른 컨테이너(옛 <code>shop-docker-devcontainer</code>)는 띄우지 않았다. 빌드가 실패하면 출력을 채팅에 붙여 넣는다.</p>
+<p>컨테이너 창 터미널에서 실행한다. <code>bootRun</code>은 앱을 띄우는 Gradle 작업이다. 포트는 dev container 설정으로 8081이다.</p>
+<pre><code>./gradlew bootRun</code></pre>
+<p>브라우저는 VS Code 명령 팔레트 "Browser: Open Integrated Browser"로 <code>http://localhost:8081/items</code>를 연다. 결과를 보기 전에 Ctrl+Shift+R로 캐시 없이 새로고침한다.</p>
+
+<ol class="steps">
+<li>
+<div class="predict">컨테이너에 터미널을 하나 더 열고 아래 명령을 치기 전에 적어 보자: 등록 폼의 상품명 <code>&lt;input&gt;</code>에는 어떤 속성들이 어떤 값으로 찍혀 나올까?</div>
+<p><code>curl -s URL</code>은 그 주소의 HTML을 그대로 출력한다(<code>-s</code>는 진행 표시를 숨긴다). <code>| grep 단어</code>는 그중 그 단어가 든 줄만 남긴다.</p>
+<pre><code>curl -s http://localhost:8081/items/add | grep itemName</code></pre>
+</li>
+<li>
+<div class="predict">등록 폼에서 상품명은 비우고, 가격에 <code>abc</code>, 수량에 <code>99999</code>를 넣고 저장하면? ① 화면은 어느 페이지인가 ② 가격 칸에는 무엇이 남아 있나 ③ 가격 칸 아래 오류 메시지는 몇 개인가</div>
+<p class="muted">문구 내용은 신경 쓰지 않는다. 오류 문구 파일(<code>errors.properties</code>)을 복사하지 않았으니 스프링 기본 문구가 나오고, 가격 문구는 길고 어색하다.</p>
+</li>
+<li>
+<div class="predict">이번엔 올바르게 입력해 저장한다. ① 주소창의 URL은? ② 그 화면에서 F5를 누른 뒤 목록에 가 보면 상품은 몇 개인가</div>
+</li>
+<li>
+<p>수정 화면에서 가격을 <code>500</code>으로 바꿔 저장해 오류가 뜨는지, 수량을 비워도 저장되는지 확인한다.</p>
+</li>
+<li>
+<div class="predict">(실험) <code>POST /items/add</code> 메서드에서 <code>BindingResult</code> 파라미터와 그것을 쓰는 코드를 잠깐 지우고, 가격에 <code>abc</code>를 넣어 저장하면 화면은?</div>
+<p>코드를 바꾼 뒤에는 실행 중인 앱을 Ctrl+C로 끄고 <code>./gradlew bootRun</code>을 다시 실행한다. 확인한 뒤 원래대로 되돌린다. 여유가 있으면 <code>BindingResult</code>를 폼 파라미터 <strong>앞</strong>으로 옮겨도 보자. 이 경우는 교재에 결과가 없으니 직접 본 것을 알려 주면 된다.</p>
+</li>
+</ol>
+<p>예측과 다르게 나온 것이 있으면 그대로 채팅에 붙여 넣는다. 끝나면 "다 했어"라고 알려 주면 채점한다.</p>
+
+<h2 id="source">1차 자료</h2>
+<ul>
+<li>교재 「스프링 MVC 2편」 <code>courses/spring-mvc2/docs/</code>: 2장 84–142줄(<code>th:object</code>·<code>th:field</code>), 3장 534줄(<code>param.status</code>), 4장 533–557줄(<code>BindingResult</code>), 5장 385–408줄(검증 순서), 5장 825–891줄(폼 객체 분리). 이 다섯 곳만 읽으면 된다.</li>
+<li><a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/redirecting-passing-data.html">Spring Framework: Redirect Attributes</a></li>
+</ul>
+<p class="note">막히거나 이해가 안 되는 곳은 언제든 채팅으로 물어보자. 레슨에 없는 것도 괜찮다.</p>
+
+<nav class="lesson-nav">
+<a href="../reference/glossary.html">용어집</a>
+<a href="../reference/form-validation.html">폼·검증 요약</a>
+</nav>
+</main>
+</body>
+</html>

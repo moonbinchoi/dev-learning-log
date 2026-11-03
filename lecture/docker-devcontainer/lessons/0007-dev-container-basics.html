@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>6회차 · Dev Container 기초</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+
+<h1>6회차 · Dev Container 기초</h1>
+<p class="subtitle">오늘의 성과: docker-lab을 컨테이너 안에서 열고, 호스트 JDK가 아닌 컨테이너의 JDK로 <code>./gradlew bootRun</code>을 돌린다. 그 앱을 5회차 <code>compose.yaml</code>의 <code>db</code>에 붙여 <code>memo</code> 테이블의 값을 브라우저에 띄운다.</p>
+
+<p>4회차에는 호스트에서 jar를 만들어 이미지에 넣었다. 그 이미지는 앱을 <b>실행</b>하는 환경이다. 오늘은 앱을 <b>개발</b>하는 환경(JDK, Gradle, 터미널, 확장)을 컨테이너로 만든다. 그 설정을 파일로 남기면 어느 PC에서나 같은 개발 환경이 뜬다. 7회차에는 같은 방법을 shop에 적용한다. 용어는 <a href="../reference/glossary.html">용어집</a>을 따른다.</p>
+
+<h2>1. Dev container는 무엇이 다른가</h2>
+<figure>
+<svg viewBox="0 0 720 270" role="img" aria-label="왼쪽 호스트에는 VS Code 창(화면)과 E 드라이브의 docker-lab 폴더가 있다. 오른쪽 컨테이너에는 확장, 터미널, JDK 25가 있고 /workspaces/docker-lab 경로에 호스트 폴더가 bind mount로 연결된다. VS Code 창과 컨테이너 안의 확장은 서로 연결되어 있다">
+  <rect class="box" x="10" y="20" width="280" height="230" rx="4"/>
+  <text x="26" y="46" font-weight="700">호스트 (Windows)</text>
+  <rect class="box" x="26" y="66" width="248" height="70" rx="4"/>
+  <text x="40" y="92" font-size="14">VS Code 창</text>
+  <text x="40" y="118" font-size="13" class="muted">화면, 키보드 입력, 테마</text>
+  <rect class="box" x="26" y="156" width="248" height="70" rx="4"/>
+  <text x="40" y="182" font-size="14">E:\…\projects\docker-lab</text>
+  <text x="40" y="208" font-size="13" class="muted">소스 파일 (원본)</text>
+
+  <rect class="box-accent" x="410" y="20" width="300" height="230" rx="4"/>
+  <text x="426" y="46" font-weight="700">컨테이너 (dev container)</text>
+  <rect class="box" x="426" y="66" width="268" height="70" rx="4"/>
+  <text x="440" y="92" font-size="14">확장 · 터미널 · JDK 25</text>
+  <text x="440" y="118" font-size="13" class="muted">./gradlew는 여기서 돈다</text>
+  <rect class="box" x="426" y="156" width="268" height="70" rx="4"/>
+  <text x="440" y="182" font-size="14">작업 폴더 (경로는 실습 B-5)</text>
+  <text x="440" y="208" font-size="13" class="muted">호스트 폴더와 같은 파일</text>
+
+  <path class="arrow" d="M274 101 L424 101" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text x="296" y="92" font-size="12" class="muted">화면 ↔ 확장</text>
+  <path class="arrow" d="M274 191 L424 191" marker-end="url(#a)"/>
+  <text x="300" y="182" font-size="12" class="muted">bind mount</text>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="currentColor"/></marker></defs>
+</svg>
+<figcaption>로컬 VS Code는 화면만 맡고, 확장은 컨테이너 안에서 돌아 컨테이너의 도구와 파일에 접근한다. 작업 폴더는 로컬에서 마운트하거나 컨테이너 안으로 복사·clone한다. (<a href="https://code.visualstudio.com/docs/devcontainers/containers">Developing inside a Container</a>)</figcaption>
+</figure>
+<ul>
+<li>VS Code는 확장을 "로컬(UI 쪽)" 또는 "컨테이너 안" 두 곳 중 한 곳에서 돌린다. 테마 같은 UI 확장은 로컬에, 대부분의 확장은 컨테이너에 설치된다. (<a href="https://code.visualstudio.com/docs/devcontainers/containers#_managing-extensions">Managing extensions</a>)</li>
+<li>작업 폴더는 2회차의 bind mount로 연결된다. 그래서 컨테이너 안에서 고친 파일이 호스트 폴더에 바로 보인다.</li>
+</ul>
+<table class="wrap">
+<tr><th></th><th>4·5회차 앱 이미지 (<code>app</code>)</th><th>오늘의 dev container (<code>dev</code>)</th></tr>
+<tr><td>목적</td><td>만든 앱을 실행한다</td><td>앱을 고치고 빌드하고 실행해 본다</td></tr>
+<tr><td>안에 든 것</td><td>JRE + 호스트에서 만든 jar</td><td>JDK, Git 등 개발 도구. 소스는 bind mount</td></tr>
+<tr><td>주 프로세스</td><td><code>java -jar …</code></td><td>할 일 없이 기다리는 명령. 작업은 터미널에서 직접 친다</td></tr>
+<tr><td>코드를 고치면</td><td>jar를 다시 만들고 이미지를 다시 빌드한다</td><td>파일이 바로 보인다. <code>./gradlew</code>를 다시 돌린다</td></tr>
+</table>
+
+<h2>2. 이미지에 적힌 사용자와 기본 명령</h2>
+<p>오늘 쓰는 이미지는 <code>mcr.microsoft.com/devcontainers/java:25</code>다. Java 25 태그는 <code>25</code>, <code>25-trixie</code>, <code>25-bookworm</code>이 있다. (<a href="https://github.com/devcontainers/images/tree/main/src/java">devcontainers/images: java</a>) 레지스트리에 있는 이 이미지의 설정을 2026-10-15에 읽어 보니 아래와 같았다.</p>
+<table>
+<tr><th>설정</th><th>값</th></tr>
+<tr><td>사용자 (<code>User</code>)</td><td><code>root</code></td></tr>
+<tr><td>기본 명령 (<code>Cmd</code>)</td><td><code>bash</code></td></tr>
+<tr><td>라벨 <code>devcontainer.metadata</code></td><td><code>"remoteUser": "vscode"</code> 등</td></tr>
+</table>
+<ul>
+<li><b>사용자</b>: <code>remoteUser</code>는 VS Code가 컨테이너 안에서 터미널과 도구를 실행할 사용자다. 지정하지 않으면 컨테이너 전체를 실행하는 사용자(대개 <code>root</code>)다. (<a href="https://containers.dev/implementors/json_reference/">devcontainer.json reference</a>) 이 이미지는 라벨에 <code>remoteUser</code>를 적어 두었다. 컨테이너는 <code>root</code>로 뜨지만 터미널은 다른 사용자일 수 있다. 실습 B-5에서 확인한다.</li>
+<li><b>기본 명령</b>: 1회차에서 봤듯이 주 프로세스가 끝나면 컨테이너는 exited가 된다. dev container 도구는 이미지의 기본 명령을 자기 명령으로 덮어써서 컨테이너가 계속 떠 있게 할 수 있다. 이것이 <code>overrideCommand</code>다. 기본값은 <code>image</code>를 쓸 때 <code>true</code>, Compose 파일을 쓸 때 <code>false</code>다. (<a href="https://containers.dev/implementors/json_reference/">devcontainer.json reference</a>)</li>
+<li>그래서 Compose로 띄울 때는 서비스에 기다리는 명령을 직접 적는다. VS Code 문서 예제는 "프로세스가 끝나도 컨테이너가 내려가지 않게 기본 명령을 덮어쓴다"는 주석과 함께 반복 <code>sleep</code>을 쓴다. (<a href="https://code.visualstudio.com/docs/devcontainers/create-dev-container#_use-docker-compose">Use Docker Compose</a>) 오늘은 같은 목적으로 <code>sleep infinity</code>를 쓴다.</li>
+</ul>
+
+<h2>3. 포트: forward와 publish</h2>
+<table class="wrap">
+<tr><th></th><th>forward (<code>forwardPorts</code>)</th><th>publish (Compose <code>ports</code>, 3회차 <code>-p</code>)</th></tr>
+<tr><td>누가 연결하나</td><td>VS Code가 자기 연결을 통해 전달한다</td><td>Docker가 호스트 포트를 연다</td></tr>
+<tr><td>앱이 보기에</td><td>접속이 <code>localhost</code>에서 온 것처럼 보인다</td><td>로컬 네트워크에 연 포트처럼 동작한다</td></tr>
+</table>
+<p class="muted">표는 <a href="https://code.visualstudio.com/docs/devcontainers/containers#_forwarding-or-publishing-a-port">Forwarding or publishing a port</a>의 설명이다.</p>
+<p>forward하려는 로컬 포트가 이미 쓰이고 있으면, 기본값에서는 알리지 않고 다른 로컬 포트로 연결한다. (<a href="https://containers.dev/implementors/json_reference/#port-attributes"><code>requireLocalPort</code></a>, 기본값 <code>false</code>) 그래서 브라우저 주소가 예상과 다를 수 있다.</p>
+<p>이 트랙의 포트는 <b>8081</b>이다. 8080은 spring-backend 트랙이 쓴다. Spring Boot는 환경 변수 <code>SERVER_PORT</code>로 포트를 바꿀 수 있다(4회차에 <code>SPRING_DATASOURCE_URL</code>로 DB 주소를 바꾼 것과 같은 방식). (<a href="https://docs.spring.io/spring-boot/how-to/webserver.html#howto.webserver.change-port">Change the HTTP Port</a>)</p>
+
+<h2>4. Gradle 캐시를 named volume에 두는 이유</h2>
+<ul>
+<li>Gradle은 내려받은 Gradle 배포판과 라이브러리를 사용자 홈의 <code>~/.gradle</code>에 둔다. (<a href="https://docs.gradle.org/current/userguide/directory_layout.html">Gradle directories</a>)</li>
+<li>그 폴더가 컨테이너의 쓰기 가능한 레이어에 있으면 2회차처럼 컨테이너를 다시 만들 때 사라진다. Rebuild할 때마다 전부 다시 내려받는다.</li>
+<li>호스트 폴더를 bind mount하는 방법도 있지만, Windows에서는 컨테이너가 VM 안에서 돌기 때문에 bind mount가 컨테이너 파일시스템보다 느리다. (<a href="https://code.visualstudio.com/remote/advancedcontainers/improve-performance">Improve container performance</a>)</li>
+<li>그래서 문서는 자주 읽고 쓰는 폴더 하나에 named volume을 붙이는 방법("Use a targeted named volume")을 보인다. 문서 예제는 non-root 사용자일 때 <code>postCreateCommand</code>에서 <code>sudo chown</code>으로 그 폴더의 소유자를 바꾼다. (<a href="https://code.visualstudio.com/remote/advancedcontainers/improve-performance#_use-a-targeted-named-volume">Use a targeted named volume</a>)</li>
+<li><code>postCreateCommand</code>는 컨테이너를 처음 만들 때 설정 마지막에 한 번 실행하는 명령이다. (<a href="https://containers.dev/implementors/json_reference/#lifecycle-scripts">Lifecycle scripts</a>)</li>
+</ul>
+
+<h2>5. <code>devcontainer.json</code> 쓰는 법</h2>
+<p>프로젝트 폴더 안 <code>.devcontainer/devcontainer.json</code>에 둔다. (<a href="https://code.visualstudio.com/docs/devcontainers/containers#_create-a-devcontainerjson-file">Create a devcontainer.json file</a>) JSON 규칙은 다섯 가지다. (<a href="https://www.json.org/json-ko.html">JSON 소개</a>)</p>
+<ul>
+<li>전체를 <code>{ }</code>로 감싼다.</li>
+<li>키와 문자열은 큰따옴표로 감싼다. 숫자는 감싸지 않는다.</li>
+<li>항목 사이에 쉼표. <b>마지막 항목 뒤에는 쉼표를 쓰지 않는다.</b></li>
+<li>목록은 <code>[ ]</code>, 묶음은 <code>{ }</code>.</li>
+<li>YAML과 달리 들여쓰기는 뜻이 없다. 읽기 좋게만 맞춘다.</li>
+</ul>
+
+<h3>예시 1: 이미지 하나로 (오늘 과제와 다른 Python 앱)</h3>
+<pre><code>{
+  "name": "flask-demo",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "forwardPorts": [5000],
+  "containerEnv": {
+    "FLASK_DEBUG": "1"
+  }
+}</code></pre>
+<table>
+<tr><th>키</th><th>뜻</th></tr>
+<tr><td><code>name</code></td><td>VS Code 화면에 보이는 이름</td></tr>
+<tr><td><code>image</code></td><td>컨테이너를 만들 이미지. 이미지 방식에서는 필수다</td></tr>
+<tr><td><code>forwardPorts</code></td><td>늘 forward할 컨테이너 포트 목록. 숫자 배열이다</td></tr>
+<tr><td><code>containerEnv</code></td><td>컨테이너 자체에 넣는 환경 변수. 바꾸면 Rebuild해야 반영된다. 값은 문자열로 쓴다</td></tr>
+</table>
+
+<h3>예시 2: Compose 파일로 (같은 Python 앱 + redis)</h3>
+<p><code>compose.yaml</code> (프로젝트 폴더 맨 위):</p>
+<pre><code>services:
+  web:                          # 운영용: 이미지를 빌드해 실행
+    build: .
+    ports:
+      - "8000:5000"
+  devbox:                       # 개발용: 도구만 있고 기다린다
+    image: mcr.microsoft.com/devcontainers/python:3.12
+    command: sleep infinity     # 주 프로세스가 끝나지 않게
+    volumes:
+      - .:/workspaces/flask-demo          # 소스 bind mount
+      - pipcache:/home/vscode/.cache/pip  # 캐시 named volume
+    environment:
+      CACHE_HOST: cache
+  cache:
+    image: redis:7
+
+volumes:
+  pipcache:</code></pre>
+<p><code>.devcontainer/devcontainer.json</code>:</p>
+<pre><code>{
+  "name": "flask-demo",
+  "dockerComposeFile": "../compose.yaml",
+  "service": "devbox",
+  "runServices": ["devbox", "cache"],
+  "workspaceFolder": "/workspaces/flask-demo",
+  "forwardPorts": [5000],
+  "postCreateCommand": "sudo chown vscode /home/vscode/.cache/pip"
+}</code></pre>
+<table>
+<tr><th>키</th><th>뜻</th></tr>
+<tr><td><code>dockerComposeFile</code></td><td>Compose 파일 경로. <code>devcontainer.json</code>이 있는 폴더 기준이다. 그래서 한 단계 위는 <code>../</code></td></tr>
+<tr><td><code>service</code></td><td>VS Code가 붙을 서비스. Compose 방식에서는 필수다</td></tr>
+<tr><td><code>runServices</code></td><td>시작할 서비스 목록. 생략하면 전부 시작한다. 위에서는 운영용 <code>web</code>을 뺐다</td></tr>
+<tr><td><code>workspaceFolder</code></td><td>VS Code가 컨테이너 안에서 열 경로. Compose 방식의 기본값은 <code>/</code>라서 직접 적는다. Compose 파일의 bind mount 대상 경로와 같게 쓴다</td></tr>
+<tr><td><code>postCreateCommand</code></td><td>컨테이너를 처음 만든 뒤 한 번 실행할 명령</td></tr>
+</table>
+<ul>
+<li>Compose 방식에서는 소스 bind mount를 Compose 파일의 <code>volumes</code>에 직접 적는다. (<a href="https://code.visualstudio.com/docs/devcontainers/create-dev-container#_use-docker-compose">Use Docker Compose</a>)</li>
+<li>Compose 방식에서 창을 닫으면 기본값(<code>shutdownAction: stopCompose</code>)에 따라 Compose 컨테이너를 멈춘다. 이미지 방식의 기본값은 <code>stopContainer</code>다. (<a href="https://containers.dev/implementors/json_reference/">devcontainer.json reference</a>)</li>
+<li>키 전체 목록은 <a href="https://containers.dev/implementors/json_reference/">devcontainer.json reference</a>에 있다.</li>
+</ul>
+
+<h2>6. 오늘 쓰는 명령</h2>
+<table>
+<tr><th>명령</th><th>하는 일</th></tr>
+<tr><td><code>code -n 폴더</code></td><td>그 폴더를 새 VS Code 창으로 연다. (<a href="https://code.visualstudio.com/docs/configure/command-line">Command Line Interface</a>)</td></tr>
+<tr><td>Dev Containers: Reopen in Container</td><td>명령 팔레트(F1)에서 고른다. 열린 폴더의 <code>devcontainer.json</code>대로 컨테이너를 만들고 그 안에서 폴더를 다시 연다. (<a href="https://code.visualstudio.com/docs/devcontainers/containers">Developing inside a Container</a>)</td></tr>
+<tr><td>Dev Containers: Rebuild Container</td><td>설정을 바꾼 뒤 컨테이너를 다시 만든다. (같은 문서)</td></tr>
+<tr><td><code>docker pull 이미지</code></td><td>이미지를 미리 내려받는다. 0회차 <code>run</code>이 내부에서 하던 일이다. (<a href="https://docs.docker.com/reference/cli/docker/image/pull/">docker pull</a>)</td></tr>
+<tr><td><code>whoami</code></td><td>지금 사용자 이름 (리눅스)</td></tr>
+<tr><td><code>pwd</code></td><td>지금 폴더 경로 (리눅스)</td></tr>
+<tr><td><code>ls -ld 경로</code></td><td>폴더 자체의 소유자·권한을 한 줄로 (리눅스). <code>-d</code>가 없으면 폴더 안 목록이 나온다</td></tr>
+<tr><td><code>java -version</code></td><td>JDK 버전</td></tr>
+<tr><td><code>./gradlew bootRun</code></td><td>Gradle wrapper로 앱을 빌드하고 실행한다. 멈출 때는 Ctrl+C. (<a href="https://docs.spring.io/spring-boot/gradle-plugin/running.html">Running your Application with Gradle</a>)</td></tr>
+</table>
+
+<h2>7. 실습 — 예측하고 직접 친다</h2>
+<div class="note">창이 두 개다. <b>Claude 창</b>(지금 이 창, <code>E:\Study\Inflearn</code>)은 호스트에 그대로 둔다. 이 창을 컨테이너로 다시 열면 이 대화가 끊긴다. Claude 창의 PowerShell 터미널 이름은 지금처럼 <code>lab</code>이다. <b>실습 창</b>은 <code>projects/docker-lab</code>만 연 새 창이고, 이것만 컨테이너로 연다. 컨테이너에는 프로젝트 폴더만 들어간다. 실습 창 터미널의 출력은 <code>@terminal:lab</code>으로 받을 수 없으니 복사해서 붙여 넣는다.</div>
+<p>docker-lab 앱의 <code>GET /</code>는 DB에서 <code>SELECT t FROM memo LIMIT 1</code>을 실행하고 <code>"v3 "</code> 뒤에 그 결과를 붙여 돌려준다.</p>
+
+<h3>A. 준비 (예측 없음)</h3>
+<ol class="steps">
+<li>
+<p>Claude 창의 <code>lab</code> 터미널(PowerShell)에서 친다. 5회차 프로젝트를 내린다(볼륨은 남는다). 그리고 오늘 이미지를 미리 받는다. 크기가 커서 몇 분 걸릴 수 있다.</p>
+<pre><code>cd E:\Study\Inflearn\projects\docker-lab
+docker compose down
+docker pull mcr.microsoft.com/devcontainers/java:25</code></pre>
+</li>
+<li>
+<p>docker-lab을 새 창(실습 창)으로 연다.</p>
+<pre><code>code -n E:\Study\Inflearn\projects\docker-lab</code></pre>
+</li>
+</ol>
+
+<h3>B. 이미지 하나로</h3>
+<ol class="steps" start="3">
+<li>
+<p><code>projects/docker-lab/.devcontainer/devcontainer.json</code>을 <b>직접 쓴다</b>. 5절 예시 1의 꼴을 따른다. 조건:</p>
+<table class="wrap">
+<tr><th>키</th><th>값</th><th>이유</th></tr>
+<tr><td><code>name</code></td><td><code>docker-lab</code></td><td>화면 표시용</td></tr>
+<tr><td><code>image</code></td><td><code>mcr.microsoft.com/devcontainers/java:25</code></td><td>앱의 Java 25 toolchain과 맞춘다</td></tr>
+<tr><td><code>forwardPorts</code></td><td><code>8081</code> 하나</td><td>이 트랙의 포트</td></tr>
+<tr><td><code>containerEnv</code></td><td><code>SERVER_PORT</code> = <code>"8081"</code></td><td>앱이 8080 대신 8081에서 듣게 한다 (3절)</td></tr>
+</table>
+<p>다 쓰면 Claude에게 리뷰를 받는다.</p>
+</li>
+<li>
+<p>실습 창에서 F1 → <b>Dev Containers: Reopen in Container</b>. 창이 다시 열리고 컨테이너를 만든다. 끝나면 Claude 창에서 Claude가 <code>docker ps</code>와 <code>docker inspect</code>로 상태를 읽는다.</p>
+<div class="predict">새 컨테이너의 COMMAND는 이미지 기본 명령인 <code>bash</code>일까? 컨테이너는 running일까, exited일까?</div>
+</li>
+<li>
+<p>실습 창에서 터미널을 연다(Ctrl+`). 이 터미널은 컨테이너 안의 셸이다. 지금 사용자 이름, 지금 폴더 경로, JDK 버전을 차례로 본다.</p>
+<pre><code>whoami
+pwd
+java -version</code></pre>
+<div class="predict">사용자는 <code>root</code>일까? Java는 호스트의 Oracle JDK 25일까, 다른 JDK일까?</div>
+<p><code>pwd</code>로 나오는 기본 작업 경로는 문서에서 찾지 못했다. 출력으로 확인한다. 이어서 Claude가 <code>docker inspect</code>로 이 경로의 bind mount 출처(호스트 경로)를 보여 준다.</p>
+</li>
+<li>
+<p>같은 터미널에서 앱을 실행한다. 처음에는 Gradle 배포판과 라이브러리를 내려받는다.</p>
+<pre><code>./gradlew bootRun</code></pre>
+<p><code>Permission denied</code>가 나오면 <code>bash gradlew bootRun</code>으로 친다.</p>
+<div class="predict">이 컨테이너에는 DB가 없다. 앱이 <code>Started</code>까지 갈까? 통합 브라우저로 <code>http://localhost:8081</code>을 열면 무엇이 보일까?</div>
+<p>확인한 뒤 터미널에서 Ctrl+C로 앱을 멈춘다. 이어서 Gradle 폴더 안의 목록을 본다. <code>~</code>는 지금 사용자의 홈 폴더다.</p>
+<pre><code>ls ~/.gradle</code></pre>
+</li>
+<li>
+<p>설정을 바꾸지 않고 컨테이너를 다시 만든다. 실습 창에서 F1 → <b>Dev Containers: Rebuild Container</b>. 끝나면 터미널에서 Gradle 폴더 목록을 다시 본다.</p>
+<pre><code>ls ~/.gradle</code></pre>
+<div class="predict">6단계에서 내려받은 것이 남아 있을까? 왜?</div>
+</li>
+</ol>
+
+<h3>C. Compose로 db 붙이기</h3>
+<ol class="steps" start="8">
+<li>
+<p>5회차 <code>compose.yaml</code>에 개발용 서비스 <code>dev</code>를 더한다. <code>app</code>과 <code>db</code>는 고치지 않는다. 5절 예시 2의 <code>devbox</code>를 따른다. 조건:</p>
+<table class="wrap">
+<tr><th>키</th><th>값</th><th>이유</th></tr>
+<tr><td>서비스 이름</td><td><code>dev</code></td><td><code>devcontainer.json</code>의 <code>service</code>와 같아야 한다</td></tr>
+<tr><td><code>image</code></td><td><code>mcr.microsoft.com/devcontainers/java:25</code></td><td>B와 같은 도구</td></tr>
+<tr><td><code>command</code></td><td><code>sleep infinity</code></td><td>Compose 방식은 기본 명령을 덮어쓰지 않는다 (2절)</td></tr>
+<tr><td><code>volumes</code> 1</td><td><code>.</code> → <code>/workspaces/docker-lab</code></td><td>소스 bind mount. <code>.</code>은 <code>compose.yaml</code>이 있는 폴더</td></tr>
+<tr><td><code>volumes</code> 2</td><td>named volume <code>gradle-cache</code> → <code>/home/vscode/.gradle</code></td><td>Gradle 캐시 (4절). 파일 맨 아래 <code>volumes:</code>에도 <code>gradle-cache:</code>를 선언한다</td></tr>
+<tr><td><code>environment</code></td><td><code>SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/docker_lab</code>, <code>SERVER_PORT: "8081"</code></td><td><code>app</code>과 같은 DB 주소. 포트는 B의 <code>containerEnv</code>를 여기로 옮긴다</td></tr>
+<tr><td><code>depends_on</code></td><td><code>db</code>가 <code>service_healthy</code></td><td><code>app</code>과 같은 꼴</td></tr>
+</table>
+<p>이어서 <code>devcontainer.json</code>을 고친다. <code>image</code>와 <code>containerEnv</code>를 지우고 아래를 넣는다. <code>name</code>과 <code>forwardPorts</code>는 둔다.</p>
+<table class="wrap">
+<tr><th>키</th><th>값</th><th>이유</th></tr>
+<tr><td><code>dockerComposeFile</code></td><td><code>../compose.yaml</code></td><td><code>.devcontainer/</code> 기준 한 단계 위</td></tr>
+<tr><td><code>service</code></td><td><code>dev</code></td><td>VS Code가 붙을 서비스</td></tr>
+<tr><td><code>runServices</code></td><td><code>dev</code>, <code>db</code></td><td><code>app</code>은 호스트 8081을 publish해서 forward와 겹친다</td></tr>
+<tr><td><code>workspaceFolder</code></td><td><code>/workspaces/docker-lab</code></td><td>bind mount 대상과 같게</td></tr>
+<tr><td><code>postCreateCommand</code></td><td><code>sudo chown vscode /home/vscode/.gradle</code></td><td>새 볼륨 폴더를 터미널 사용자가 쓸 수 있게 (4절)</td></tr>
+</table>
+<p>두 파일을 다 쓰면 Claude에게 리뷰를 받는다.</p>
+</li>
+<li>
+<p>실습 창에서 F1 → <b>Dev Containers: Rebuild Container</b>. 끝나면 Claude가 <code>docker ps -a</code>와 <code>docker volume ls</code>로 상태를 읽는다.</p>
+<div class="predict">B에서 쓰던 컨테이너는 어떻게 됐을까? 실행 중인 컨테이너는 몇 개이고 각각 어떤 이름일까? <code>gradle-cache</code> 볼륨은 어떤 이름으로 만들어질까? db는 5회차의 <code>docker-lab_pgdata</code>를 쓸까?</div>
+</li>
+<li>
+<p>실습 창 터미널에서 Gradle 폴더 자체의 소유자를 본다. <code>-d</code>가 없으면 폴더 안 목록이 나온다.</p>
+<pre><code>ls -ld ~/.gradle</code></pre>
+<p><b>Claude 창의 <code>lab</code> 터미널(PowerShell)</b>에서 db에 <code>memo</code> 테이블을 만든다. 실습 창 터미널(컨테이너 안)에서 치지 않는다. <code>&lt;db 컨테이너&gt;</code>는 9단계 <code>docker ps</code>에서 읽은 db 컨테이너 이름으로 바꾼다. <code>-c</code>는 뒤의 SQL을 실행하고 끝낸다는 뜻이다. 줄 끝의 백틱(<code>`</code>)은 PowerShell에서 다음 줄로 이어 쓴다는 뜻이다.</p>
+<pre><code>docker exec &lt;db 컨테이너&gt; psql -U postgres -d docker_lab `
+  -c "CREATE TABLE memo (t text); INSERT INTO memo VALUES ('hello dev');"</code></pre>
+</li>
+<li>
+<p>실습 창 터미널에서 앱을 실행하고 브라우저로 <code>http://localhost:8081</code>을 연다(Ctrl+Shift+R).</p>
+<pre><code>./gradlew bootRun</code></pre>
+<div class="predict">Gradle이 다시 내려받을까? 브라우저에는 무엇이 보일까?</div>
+<p>확인한 뒤 Ctrl+C.</p>
+</li>
+<li>
+<p>한 번 더 F1 → <b>Dev Containers: Rebuild Container</b>. 끝나면 다시 실행한다.</p>
+<pre><code>./gradlew bootRun</code></pre>
+<div class="predict">이번에는 내려받을까? 11단계보다 빨리 <code>Started</code>가 찍힐까?</div>
+</li>
+</ol>
+
+<h3>D. 창 닫기</h3>
+<ol class="steps" start="13">
+<li>
+<p>실습 창에서 Ctrl+C로 앱을 멈추고, 실습 창을 닫는다. Claude가 <code>docker ps -a</code>로 상태를 읽는다.</p>
+<div class="predict"><code>dev</code>와 <code>db</code> 컨테이너는 지워질까, 멈출까, 계속 돌까? 왜?</div>
+</li>
+</ol>
+
+<h2>8. 남겨 둘 것</h2>
+<p><code>.devcontainer/devcontainer.json</code>, 고친 <code>compose.yaml</code>, 볼륨은 남긴다. 7회차에 shop의 <code>devcontainer.json</code>을 쓸 때 오늘 파일과 비교한다.</p>
+<p class="muted">실무에서는 개발용 서비스를 운영용 <code>compose.yaml</code>에 섞지 않고 <code>.devcontainer/</code> 안에 따로 두는 경우가 많다. 여러 Compose 파일을 겹쳐 쓰는 방법은 이 트랙에서 다루지 않는다. (<a href="https://containers.dev/implementors/json_reference/"><code>dockerComposeFile</code> 배열</a>) 또 오늘 <code>compose.yaml</code>로 호스트에서 <code>docker compose up -d</code>를 치면 <code>dev</code>도 함께 뜬다.</p>
+
+<h2>더 읽을 것</h2>
+<p>1차 자료: <a href="https://code.visualstudio.com/docs/devcontainers/containers">VS Code — Developing inside a Container</a>. 오늘 그림의 구조와 "Forwarding or publishing a port"를 읽는다. 이어서 <a href="https://code.visualstudio.com/docs/devcontainers/create-dev-container#_use-docker-compose">Use Docker Compose</a>의 예제를 오늘 파일과 비교한다.</p>
+
+<div class="note">막히거나 출력이 예측과 다르면 출력을 붙여 넣고 물어보세요. Claude가 이 과정의 선생님입니다.</div>
+
+<nav class="lesson-nav">
+<a href="0006-compose.html">← 5회차 · Compose</a>
+<a href="../reference/glossary.html">용어집 →</a>
+</nav>
+
+</main>
+</body>
+</html>

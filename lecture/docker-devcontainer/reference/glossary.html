@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 용어집</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+
+<h1>Docker 용어집</h1>
+<p class="subtitle">모든 레슨은 이 용어를 쓴다. 회차마다 늘어난다.</p>
+
+<table>
+<tr><th>용어</th><th>뜻</th><th>회차</th></tr>
+<tr><td><b>이미지</b> (image)</td><td>컨테이너 실행에 필요한 파일·바이너리·라이브러리·설정을 묶은 패키지. 불변이다. <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">docs</a></td><td>0</td></tr>
+<tr><td><b>레이어</b> (layer)</td><td>이미지를 이루는 단위. 각 레이어는 파일 추가·삭제·수정 묶음이다. <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">docs</a></td><td>0, 4</td></tr>
+<tr><td><b>컨테이너</b> (container)</td><td>이미지로부터 만든 격리된 프로세스. 같은 이미지에서 여러 개를 만든다. <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">docs</a></td><td>0</td></tr>
+<tr><td><b>VM</b></td><td>자체 커널과 드라이버를 가진 운영체제 전체. 컨테이너는 커널을 공유한다는 점이 다르다.</td><td>0</td></tr>
+<tr><td><b>Docker 클라이언트</b> (CLI)</td><td>사용자가 치는 <code>docker</code> 명령. 요청을 데몬에 보낸다. Windows 호스트에서 돈다.</td><td>0</td></tr>
+<tr><td><b>Docker 데몬</b> (Engine)</td><td>이미지를 받고 컨테이너를 만들고 실행하는 쪽. Docker Desktop에서는 WSL 2 안에서 돈다.</td><td>0</td></tr>
+<tr><td><b>레지스트리</b></td><td>이미지를 보관하고 내려받는 곳. 기본값은 Docker Hub.</td><td>0</td></tr>
+<tr><td><b>WSL 2</b></td><td>Microsoft가 만든 리눅스 커널. VM을 직접 관리하지 않고 리눅스 배포판을 돌린다. <a href="https://docs.docker.com/desktop/features/wsl/">docs</a></td><td>0</td></tr>
+<tr><td><b>docker-desktop 배포판</b></td><td>Docker Desktop이 쓰는 전용 WSL 배포판. 엔진이 여기서 돈다.</td><td>0</td></tr>
+<tr><td><b>수명주기</b> (lifecycle)</td><td>컨테이너 상태: created, running, paused, restarting, exited, removing, dead. 주 프로세스가 끝나면 exited가 되고, <code>rm</code> 전까지 남는다. <a href="https://docs.docker.com/reference/cli/docker/container/ps/#status">docs</a></td><td>1</td></tr>
+<tr><td><b>쓰기 가능한 컨테이너 레이어</b></td><td><code>create</code>가 이미지 위에 만드는 레이어. 컨테이너 안에서 생긴 변경이 여기에 쌓인다. <a href="https://docs.docker.com/reference/cli/docker/container/create/">docs</a></td><td>1, 2</td></tr>
+<tr><td><b>재시작 정책</b></td><td>종료된 컨테이너를 Docker가 다시 켤지 정하는 설정. 기본값 <code>no</code>. <a href="https://docs.docker.com/reference/cli/docker/container/run/#restart">docs</a></td><td>1</td></tr>
+<tr><td><b>볼륨</b> (volume)</td><td>Docker 데몬이 만들고 관리하는 저장소. 컨테이너를 지워도 남는다. 빈 볼륨을 붙이면 그 경로의 원래 파일이 복사된다. <a href="https://docs.docker.com/engine/storage/volumes/">docs</a></td><td>2</td></tr>
+<tr><td><b>named / anonymous volume</b></td><td>이름을 준 볼륨 / Docker가 무작위 이름을 붙인 볼륨. 이미지의 <code>VOLUME</code> 선언 경로에는 <code>-v</code> 없이도 anonymous volume이 붙는다. <a href="https://docs.docker.com/engine/storage/volumes/">docs</a></td><td>2</td></tr>
+<tr><td><b>bind mount</b></td><td>호스트의 경로를 컨테이너에 그대로 연결한다. 양쪽이 같은 파일을 고친다. 원래 파일은 가려진다. <a href="https://docs.docker.com/engine/storage/bind-mounts/">docs</a></td><td>2</td></tr>
+<tr><td><b>publish</b></td><td>호스트 포트를 컨테이너 포트에 연결해 밖에서 들어오게 한다. 주소를 생략하면 호스트의 모든 주소에 열린다. <a href="https://docs.docker.com/engine/network/port-publishing/">docs</a></td><td>3</td></tr>
+<tr><td><b>EXPOSE</b></td><td>이미지가 쓰는 포트를 적어 두는 Dockerfile 명령. publish하지 않는다. <a href="https://docs.docker.com/reference/dockerfile/#expose">docs</a></td><td>3</td></tr>
+<tr><td><b>기본 bridge</b></td><td><code>--network</code> 없이 띄운 컨테이너가 모두 붙는 네트워크. 서로 IP로만 찾는다. <a href="https://docs.docker.com/engine/network/drivers/bridge/">docs</a></td><td>3</td></tr>
+<tr><td><b>사용자 정의 bridge</b></td><td><code>network create</code>로 만든 네트워크. 컨테이너 이름으로 DNS 해석, 붙인 것끼리만 통신, 모든 포트가 서로 열림, 실행 중에 붙이고 뗌. <a href="https://docs.docker.com/engine/network/drivers/bridge/#differences-between-user-defined-bridges-and-the-default-bridge">docs</a></td><td>3</td></tr>
+<tr><td><b>Dockerfile</b></td><td>이미지를 만드는 명령을 위에서 아래로 적은 파일. <code>FROM</code>으로 시작한다. <a href="https://docs.docker.com/reference/dockerfile/">docs</a></td><td>4</td></tr>
+<tr><td><b>빌드 캐시</b></td><td>이전 빌드의 레이어를 재사용하는 것. 한 단계가 무효가 되면 그 뒤 단계는 모두 다시 실행된다. <a href="https://docs.docker.com/build/cache/">docs</a></td><td>4</td></tr>
+<tr><td><b>빌드 컨텍스트</b></td><td><code>docker build</code>에 준 경로 아래에서 빌드가 접근할 수 있는 파일 범위. 빌더는 필요한 파일만 가져가고, <code>COPY</code>는 이 안의 파일만 가져온다. <a href="https://docs.docker.com/build/concepts/context/">docs</a></td><td>4</td></tr>
+<tr><td><b>.dockerignore</b></td><td>빌드 컨텍스트에서 뺄 경로를 적는 파일. <code>!</code> 줄은 예외. <a href="https://docs.docker.com/build/concepts/context/#dockerignore-files">docs</a></td><td>4</td></tr>
+<tr><td><b>exec form / shell form</b></td><td><code>["java", "-jar", "app.jar"]</code>처럼 JSON 배열로 써서 셸 없이 실행 / 문자열로 써서 <code>/bin/sh -c</code>로 실행. <a href="https://docs.docker.com/reference/dockerfile/#shell-and-exec-form">docs</a></td><td>4</td></tr>
+<tr><td><b>Compose</b></td><td>여러 컨테이너로 된 앱을 YAML 파일 하나(<code>compose.yaml</code>)로 선언하고 명령 하나로 띄우는 도구. <a href="https://docs.docker.com/compose/">docs</a></td><td>5</td></tr>
+<tr><td><b>서비스</b> (service)</td><td><code>compose.yaml</code>의 <code>services:</code> 아래 항목 하나. 같은 설정으로 만드는 컨테이너의 정의다. 기본 네트워크에서 서비스 이름으로 찾을 수 있다. <a href="https://docs.docker.com/compose/how-tos/networking/">docs</a></td><td>5</td></tr>
+<tr><td><b>프로젝트</b> (project)</td><td>Compose가 만든 리소스의 묶음. 기본 이름은 <code>compose.yaml</code>이 있는 폴더 이름이고, 네트워크·볼륨 이름 앞에 붙는다. <a href="https://docs.docker.com/compose/how-tos/networking/">docs</a></td><td>5</td></tr>
+<tr><td><b>&lt;프로젝트&gt;_default 네트워크</b></td><td>Compose가 프로젝트마다 만드는 네트워크. 모든 서비스가 붙고, 서비스 이름으로 서로 찾는다. 이름 DNS가 없는 기본 bridge와 다르다. <a href="https://docs.docker.com/compose/how-tos/networking/">docs</a></td><td>5</td></tr>
+<tr><td><b>명령형 / 선언형</b></td><td>할 일을 순서대로 명령한다(<code>docker run</code>) / 원하는 상태를 파일에 적으면 도구가 지금 상태와 비교해 맞춘다(<code>compose.yaml</code> + <code>up</code>). <a href="https://docs.docker.com/reference/cli/docker/compose/up/">docs</a></td><td>5</td></tr>
+<tr><td><b>depends_on</b></td><td>서비스 시작 순서. 짧게 쓰면 먼저 시작만 하고, <code>condition: service_healthy</code>면 healthcheck 통과까지 기다린다. <a href="https://docs.docker.com/reference/compose-file/services/#depends_on">docs</a></td><td>5</td></tr>
+<tr><td><b>healthcheck</b></td><td>컨테이너 안에서 주기적으로 실행하는 확인 명령. 종료 코드 0이면 healthy. <code>depends_on</code>의 <code>service_healthy</code>가 이것을 기다린다. <a href="https://docs.docker.com/reference/dockerfile/#healthcheck">docs</a></td><td>5</td></tr>
+<tr><td><b>external</b></td><td>Compose 밖에서 만든 볼륨·네트워크를 쓴다는 선언. Compose가 만들지도 지우지도 않는다. <a href="https://docs.docker.com/reference/compose-file/volumes/">docs</a></td><td>5</td></tr>
+<tr><td><b>dev container</b></td><td>개발 도구(JDK, 확장, 터미널)를 담아 개발 환경으로 쓰는 컨테이너. VS Code 창은 호스트에서 화면만 맡고 확장은 컨테이너 안에서 돈다. <a href="https://code.visualstudio.com/docs/devcontainers/containers">docs</a></td><td>6</td></tr>
+<tr><td><b>devcontainer.json</b></td><td>dev container 설정 파일. <code>.devcontainer/</code>에 둔다. <code>image</code> 방식과 <code>dockerComposeFile</code> 방식이 있다. <a href="https://containers.dev/implementors/json_reference/">docs</a></td><td>6</td></tr>
+<tr><td><b>forward</b> (<code>forwardPorts</code>)</td><td>VS Code가 자기 연결로 컨테이너 포트를 로컬에 전달하는 것. 앱에는 <code>localhost</code> 접속처럼 보인다. Docker의 publish와 다르다. <a href="https://code.visualstudio.com/docs/devcontainers/containers#_forwarding-or-publishing-a-port">docs</a></td><td>6</td></tr>
+<tr><td><b>overrideCommand</b></td><td>도구가 이미지 기본 명령을 덮어써 컨테이너를 계속 띄울지. 기본값은 <code>image</code> 방식 <code>true</code>, Compose 방식 <code>false</code>. <a href="https://containers.dev/implementors/json_reference/">docs</a></td><td>6</td></tr>
+<tr><td><b>remoteUser</b></td><td>VS Code가 컨테이너 안에서 터미널과 도구를 실행하는 사용자. 기본값은 컨테이너를 실행하는 사용자. <a href="https://containers.dev/implementors/json_reference/">docs</a></td><td>6</td></tr>
+<tr><td><b>postCreateCommand</b></td><td>컨테이너를 처음 만든 뒤 설정 마지막에 한 번 실행하는 명령. <a href="https://containers.dev/implementors/json_reference/#lifecycle-scripts">docs</a></td><td>6</td></tr>
+<tr><td><b>feature</b></td><td>컨테이너를 만들 때 이미지 위에 도구를 설치하는 스크립트 묶음. <code>features</code>에 ID와 옵션 객체로 적는다. Claude Code는 <code>ghcr.io/anthropics/devcontainer-features/claude-code:1.0</code>(태그는 스크립트 버전) <a href="https://code.claude.com/docs/en/devcontainer">docs</a></td><td>8</td></tr>
+<tr><td><b>CLAUDE_CONFIG_DIR</b></td><td>Claude Code 설정 폴더(기본 <code>~/.claude</code>)를 바꾸는 환경 변수. 지정하면 <code>.claude.json</code>도 그 안에 쓴다. 볼륨과 같은 경로로 두면 Rebuild 뒤에도 로그인이 남는다 <a href="https://code.claude.com/docs/en/env-vars">docs</a></td><td>8</td></tr>
+<tr><td><b><code>~/.claude/</code> · <code>~/.claude.json</code></b></td><td>Claude Code 설정 폴더(설정, 사용자 <code>CLAUDE.md</code>, 세션 기록, 리눅스 인증 파일 <code>.credentials.json</code>) · 그 폴더 <b>밖</b>의 파일(OAuth 계정, 프로젝트 신뢰, 개인 MCP) <a href="https://code.claude.com/docs/en/claude-directory">docs</a></td><td>8</td></tr>
+<tr><td><b>권한 모드</b> (permission mode)</td><td>Claude가 도구를 쓰기 전에 묻는 정도. <code>default</code>(화면 표시 Manual, 읽기만) · <code>acceptEdits</code> · <code>plan</code> · <code>auto</code>(분류기 = 실행 전 동작을 검사하는 별도 모델, v2.1.283+ 시작 모드) · <code>dontAsk</code> · <code>bypassPermissions</code>(전부, 격리 환경 전용, root·sudo로는 이 모드 시작 불가) <a href="https://code.claude.com/docs/en/permission-modes">docs</a></td><td>8</td></tr>
+<tr><td><b>브랜치</b> (branch)</td><td>커밋 하나를 가리키는 가벼운 포인터. 새 커밋을 만들면 지금 브랜치가 그 커밋으로 옮겨 간다. <a href="https://git-scm.com/book/en/v2/Git-Branching-Branches-in-a-Nutshell">docs</a></td><td>7</td></tr>
+<tr><td><b>HEAD</b></td><td>지금 있는 브랜치를 가리키는 포인터. worktree마다 따로 있다. <a href="https://git-scm.com/book/en/v2/Git-Branching-Branches-in-a-Nutshell">docs</a></td><td>7</td></tr>
+<tr><td><b>worktree</b> (main / linked)</td><td>한 저장소에 붙은 작업 폴더. 원래 폴더 / <code>worktree add</code>로 붙인 폴더. 커밋·브랜치는 공유하고, 같은 브랜치를 두 곳에서 꺼낼 수 없다. linked의 <code>.git</code>은 main의 <code>.git/worktrees/&lt;이름&gt;</code>을 가리키는 파일이다. <a href="https://git-scm.com/docs/git-worktree">docs</a></td><td>7</td></tr>
+<tr><td><b>.gitattributes</b> (<code>* text=auto eol=lf</code>)</td><td>저장소에 넣는 경로별 git 규칙. <code>text=auto</code>는 텍스트를 LF로 저장하고 비교 때도 그렇게 바꿔 본다. <code>eol=lf</code>는 꺼낼 때 줄 끝. 아래 줄이 위 줄을 이긴다. <a href="https://git-scm.com/docs/gitattributes">docs</a></td><td>7</td></tr>
+<tr><td><b>core.autocrlf</b></td><td>컴퓨터별 줄 끝 변환 설정. Git for Windows는 시스템 설정에 <code>true</code>를 넣고, Dev Containers는 사용자 <code>.gitconfig</code>만 복사하므로 컨테이너에는 없다(7회차 실측). <a href="https://code.visualstudio.com/docs/devcontainers/tips-and-tricks#_resolving-git-line-ending-issues-in-containers-resulting-in-many-modified-files">docs</a></td><td>7</td></tr>
+<tr><td><b>common dir</b></td><td>모든 worktree가 함께 쓰는 main worktree의 <code>.git</code> 폴더. 커밋과 브랜치가 여기 있다. <a href="https://git-scm.com/docs/git-worktree#_details">docs</a></td><td>7</td></tr>
+<tr><td><b>print mode</b> (<code>-p</code>)</td><td>Claude Code를 대화 없이 한 번 실행하는 방식. 프롬프트를 받아 끝까지 일하고 결과를 출력한 뒤 끝난다. v2.1.302+에서 모드를 정하지 않으면 Manual로 시작하고, 승인이 필요한 호출은 거부된다 <a href="https://code.claude.com/docs/en/headless">docs</a></td><td>9</td></tr>
+<tr><td><b>session_id</b></td><td>대화 하나의 ID. <code>--resume</code>에 주면 그 대화에 이어서 시킨다. 기록은 설정 폴더의 <code>projects/</code> 아래에 있다 <a href="https://code.claude.com/docs/en/sessions">docs</a></td><td>9</td></tr>
+<tr><td><b>permission_denials</b></td><td><code>-p</code> JSON 결과의 필드. 권한이 없어 거부된 도구 호출 목록 <a href="https://code.claude.com/docs/en/headless">docs</a></td><td>9</td></tr>
+<tr><td><b>계정 커넥터</b> (claude.ai connectors)</td><td>claude.ai 계정에 연결한 외부 서비스(Gmail, Notion 등). 로그인하면 컨테이너 Claude에도 들어온다. 끄기: 환경 변수 <code>ENABLE_CLAUDEAI_MCP_SERVERS=false</code>(그 프로세스만) 또는 설정 <code>"disableClaudeAiConnectors": true</code>(어느 범위든 <code>true</code>가 이긴다) <a href="https://code.claude.com/docs/en/mcp">docs</a></td><td>8, 9</td></tr>
+<tr><td><b>--bare</b></td><td><code>-p</code>에서 hook·skill·MCP·<code>CLAUDE.md</code> 자동 탐색을 끈다. 구독 로그인 대신 API 키가 필요하다. 없으면 <code>-p</code>는 신뢰 확인 없이 프로젝트 hook과 <code>.mcp.json</code>을 실행한다 <a href="https://code.claude.com/docs/en/headless">docs</a></td><td>9</td></tr>
+<tr><td><b>이슈 파일</b></td><td>호스트 Claude가 프로젝트 안에 쓰는 작업 지시서. 요구사항과 완료 기준을 담는다. 호스트와 컨테이너 Claude는 서로 메시지를 보낼 수 없어서 파일로 넘긴다 <a href="https://code.claude.com/docs/en/cross-session-messaging">docs</a></td><td>9</td></tr>
+<tr><td><b>devcontainer CLI</b></td><td>Dev Container 명세의 공식 CLI(npm <code>@devcontainers/cli</code>, 명령 <code>devcontainer</code>). VS Code 없이 dev container를 띄우고(<code>up</code>) 명령을 실행한다(<code>exec</code>) <a href="https://github.com/devcontainers/cli">docs</a></td><td>마무리</td></tr>
+<tr><td><b>dev container 라벨</b></td><td>VS Code·CLI가 컨테이너에 붙이는 표식. <code>devcontainer.local_folder</code>(호스트 폴더)와 <code>devcontainer.config_file</code>(설정 파일). CLI는 컨테이너 이름 대신 이 라벨로 컨테이너를 찾는다 <a href="https://github.com/devcontainers/cli/blob/main/src/spec-node/utils.ts">source</a></td><td>마무리</td></tr>
+<tr><td><b>userEnvProbe</b></td><td>도구가 사용자 셸의 환경 변수를 읽어 와 명령에 쓰는 방식. CLI <code>exec</code>는 이것과 <code>remoteUser</code>·<code>remoteEnv</code>를 적용한다 <a href="https://containers.dev/implementors/json_reference/">docs</a></td><td>마무리</td></tr>
+</table>
+
+<h2>명령</h2>
+<table>
+<tr><th>명령</th><th>하는 일</th><th>회차</th></tr>
+<tr><td><code>docker version</code></td><td>클라이언트와 서버(데몬) 버전을 따로 보여 준다</td><td>0</td></tr>
+<tr><td><code>docker run IMAGE</code></td><td>이미지로 새 컨테이너를 만들고 실행한다. 이미지가 없으면 먼저 pull한다 <a href="https://docs.docker.com/reference/cli/docker/container/run/">docs</a></td><td>0</td></tr>
+<tr><td><code>docker ps</code> / <code>ps -a</code></td><td>실행 중인 컨테이너 / 종료된 것까지 전부</td><td>0</td></tr>
+<tr><td><code>docker images</code></td><td>로컬에 있는 이미지 목록</td><td>0</td></tr>
+<tr><td><code>docker run -d --name N</code></td><td>백그라운드로 실행하고 ID를 출력한다 / 이름을 붙인다 <a href="https://docs.docker.com/reference/cli/docker/container/run/#detach">docs</a></td><td>1</td></tr>
+<tr><td><code>docker exec -it N sh</code></td><td>실행 중인 컨테이너에 새 명령을 하나 더 띄운다. <code>-i</code> STDIN 유지, <code>-t</code> TTY <a href="https://docs.docker.com/reference/cli/docker/container/exec/">docs</a></td><td>1</td></tr>
+<tr><td><code>docker logs -f N</code></td><td>주 프로세스의 STDOUT·STDERR. <code>-f</code>는 계속 따라간다 <a href="https://docs.docker.com/reference/cli/docker/container/logs/#follow">docs</a></td><td>1</td></tr>
+<tr><td><code>docker stop N</code></td><td>SIGTERM, 유예(기본 10초) 뒤 SIGKILL <a href="https://docs.docker.com/reference/cli/docker/container/stop/">docs</a></td><td>1</td></tr>
+<tr><td><code>docker start N</code></td><td>멈춘 컨테이너를 다시 시작한다 <a href="https://docs.docker.com/reference/cli/docker/container/start/">docs</a></td><td>1</td></tr>
+<tr><td><code>docker rm N</code> / <code>-f</code></td><td>컨테이너 삭제 / 실행 중이면 SIGKILL로 끝내고 삭제 <a href="https://docs.docker.com/reference/cli/docker/container/rm/#force">docs</a></td><td>1</td></tr>
+<tr><td><code>docker run -v 이름:/경로</code></td><td>named volume을 붙인다. 없으면 새로 만든다 <a href="https://docs.docker.com/engine/storage/volumes/">docs</a></td><td>2</td></tr>
+<tr><td><code>docker run -v 호스트경로:/경로</code></td><td>bind mount. 호스트 경로가 없으면 디렉터리로 만든다 <a href="https://docs.docker.com/engine/storage/bind-mounts/">docs</a></td><td>2</td></tr>
+<tr><td><code>docker volume ls / inspect / rm</code></td><td>볼륨 목록 / 상세(<code>Mountpoint</code> 등) / 삭제 <a href="https://docs.docker.com/engine/storage/volumes/">docs</a></td><td>2</td></tr>
+<tr><td><code>docker rm -v N</code></td><td>컨테이너와 함께 anonymous volume을 지운다. named volume은 남는다 <a href="https://docs.docker.com/reference/cli/docker/container/rm/">docs</a></td><td>2</td></tr>
+<tr><td><code>docker run --rm</code></td><td>컨테이너가 끝나면 바로 지운다 <a href="https://docs.docker.com/reference/cli/docker/container/run/#rm">docs</a></td><td>2</td></tr>
+<tr><td><code>docker run -p H:C</code> / <code>-P</code></td><td>호스트 H를 컨테이너 C에 publish / <code>EXPOSE</code>된 포트를 무작위 호스트 포트에 publish <a href="https://docs.docker.com/reference/cli/docker/container/run/#publish">docs</a></td><td>3</td></tr>
+<tr><td><code>docker port N</code></td><td>컨테이너의 포트 매핑 <a href="https://docs.docker.com/reference/cli/docker/container/port/">docs</a></td><td>3</td></tr>
+<tr><td><code>docker network create / inspect / connect</code></td><td>사용자 정의 bridge 생성 / 상세와 붙은 컨테이너 / 실행 중인 컨테이너를 붙임 <a href="https://docs.docker.com/reference/cli/docker/network/">docs</a></td><td>3</td></tr>
+<tr><td><code>docker run --network 이름</code></td><td>컨테이너를 그 네트워크에 붙여 만든다 <a href="https://docs.docker.com/reference/cli/docker/container/run/#network">docs</a></td><td>3</td></tr>
+<tr><td><code>docker build -t 이름:태그 .</code></td><td>현재 폴더를 컨텍스트로 이미지를 만들고 이름을 붙인다. <code>--progress=plain</code>은 단계별 출력 <a href="https://docs.docker.com/reference/cli/docker/buildx/build/">docs</a></td><td>4</td></tr>
+<tr><td><code>docker history 이미지</code></td><td>이미지의 레이어와 각각을 만든 명령·크기 <a href="https://docs.docker.com/reference/cli/docker/image/history/">docs</a></td><td>4</td></tr>
+<tr><td><code>docker run -e 키=값</code></td><td>컨테이너에 환경 변수를 넣는다 <a href="https://docs.docker.com/reference/cli/docker/container/run/#env">docs</a></td><td>4</td></tr>
+<tr><td><code>docker compose config</code></td><td>기본값까지 채운 최종 설정을 출력한다. 아무것도 만들지 않는다 <a href="https://docs.docker.com/reference/cli/docker/compose/config/">docs</a></td><td>5</td></tr>
+<tr><td><code>docker compose up -d</code> / <code>--build</code></td><td>네트워크·볼륨·컨테이너를 만들어 백그라운드로 시작한다. 바뀐 서비스만 다시 만든다 / 시작 전에 이미지를 빌드한다 <a href="https://docs.docker.com/reference/cli/docker/compose/up/">docs</a></td><td>5</td></tr>
+<tr><td><code>docker compose ps / logs / exec</code></td><td>이 프로젝트의 컨테이너 목록 / 서비스 로그 / 서비스 컨테이너에서 명령 실행 <a href="https://docs.docker.com/reference/cli/docker/compose/">docs</a></td><td>5</td></tr>
+<tr><td><code>docker compose down</code> / <code>-v</code></td><td>컨테이너와 네트워크를 지운다 / 선언한 named volume도 지운다(external 제외) <a href="https://docs.docker.com/reference/cli/docker/compose/down/">docs</a></td><td>5</td></tr>
+<tr><td><code>docker pull 이미지</code></td><td>이미지를 미리 내려받는다 <a href="https://docs.docker.com/reference/cli/docker/image/pull/">docs</a></td><td>6</td></tr>
+<tr><td><code>code -n 폴더</code></td><td>폴더를 새 VS Code 창으로 연다 <a href="https://code.visualstudio.com/docs/configure/command-line">docs</a></td><td>6</td></tr>
+<tr><td>Dev Containers: Reopen in Container / Rebuild Container</td><td>명령 팔레트(F1). <code>devcontainer.json</code>대로 컨테이너를 만들어 그 안에서 폴더를 연다 / 설정을 바꾼 뒤 컨테이너를 다시 만든다 <a href="https://code.visualstudio.com/docs/devcontainers/containers">docs</a></td><td>6</td></tr>
+<tr><td><code>./gradlew bootRun</code></td><td>Gradle wrapper로 Spring Boot 앱을 빌드하고 실행한다. 멈출 때는 Ctrl+C <a href="https://docs.spring.io/spring-boot/gradle-plugin/running.html">docs</a></td><td>6</td></tr>
+<tr><td><code>./gradlew build</code></td><td>컴파일, 테스트, jar 만들기를 한 번에 <a href="https://docs.gradle.org/current/userguide/java_plugin.html">docs</a></td><td>7</td></tr>
+<tr><td><code>git branch</code></td><td>브랜치 목록. 지금 브랜치 <code>*</code>, 다른 worktree에 꺼낸 브랜치 <code>+</code> <a href="https://git-scm.com/docs/git-branch">docs</a></td><td>7</td></tr>
+<tr><td><code>git worktree add --relative-paths -b B 경로</code></td><td>새 브랜치 B를 만들어 경로에 새 작업 폴더로 꺼낸다. <code>.git</code> 파일에 상대 경로를 적는다 <a href="https://git-scm.com/docs/git-worktree">docs</a></td><td>7</td></tr>
+<tr><td><code>git worktree list</code></td><td>worktree 목록. 줄마다 경로·커밋·브랜치 <a href="https://git-scm.com/docs/git-worktree">docs</a></td><td>7</td></tr>
+<tr><td><code>claude [--permission-mode 모드]</code></td><td>Claude Code 대화형 세션 시작. 처음이면 로그인 안내 <a href="https://code.claude.com/docs/en/cli-reference">docs</a></td><td>8</td></tr>
+<tr><td><code>/context</code></td><td>세션 안에서: 맥락 구성. Memory files에 시작할 때 불러온 <code>CLAUDE.md</code>가 나온다(<code>/memory</code>는 없는 파일 위치도 보여 준다) <a href="https://code.claude.com/docs/en/memory#view-and-edit-with-%2Fmemory">docs</a></td><td>8</td></tr>
+<tr><td><code>printenv 이름…</code></td><td>환경 변수 값을 한 줄씩. 정의되지 않은 이름은 출력 없음 <a href="https://www.gnu.org/software/coreutils/manual/html_node/printenv-invocation.html">docs</a></td><td>8</td></tr>
+<tr><td><code>docker exec -u 사용자 -w 경로 -e 키=값 N 명령</code></td><td>그 사용자로 / 그 폴더에서 / 환경 변수를 더해 실행. 안 주면 컨테이너를 만들 때의 작업 폴더와 환경 변수 <a href="https://docs.docker.com/reference/cli/docker/container/exec/">docs</a></td><td>9</td></tr>
+<tr><td><code>docker ps --format "{{.Names}}"</code></td><td>컨테이너 목록을 그 칸만 골라 출력 <a href="https://docs.docker.com/reference/cli/docker/container/ls/#format">docs</a></td><td>9</td></tr>
+<tr><td><code>git -C 폴더 …</code> / <code>log --oneline -N</code> / <code>show [--stat] HEAD</code></td><td>그 폴더에서 실행한 것처럼 / 최근 커밋 N개를 한 줄씩 / 마지막 커밋의 작성자·메시지·바뀐 줄(파일 목록만) <a href="https://git-scm.com/docs/git-show">docs</a></td><td>9</td></tr>
+<tr><td><code>$r = … | ConvertFrom-Json</code> / <code>Format-List</code> / <code>Select-String</code></td><td>PowerShell: JSON 출력을 객체로(<code>$r.필드</code>로 읽기) / 고른 필드만 한 줄씩 / 그 문자열이 든 줄만 <a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/convertfrom-json">docs</a></td><td>9</td></tr>
+<tr><td><code>[Console]::OutputEncoding = [Text.Encoding]::UTF8</code></td><td>PowerShell: 외부 프로그램 출력을 UTF-8로 읽게 맞춘다. 그 터미널에서만</td><td>9</td></tr>
+<tr><td><code>claude -p "…" --output-format json</code></td><td>대화 없이 한 번 실행하고 결과를 JSON으로(<code>result</code>, <code>session_id</code>, <code>permission_denials</code> 등) <a href="https://code.claude.com/docs/en/headless">docs</a></td><td>9</td></tr>
+<tr><td><code>--resume ID</code> / <code>--allowedTools "규칙,…"</code></td><td>그 세션에 이어서 / 나열한 도구만 묻지 않고 허용(<code>Bash(git commit *)</code>: 접두사 일치. <code>*</code> 앞 공백이 단어 경계라서 없으면 <code>git commit-tree</code>도 잡힌다). 이어 갈 때 권한 옵션은 다시 준다 <a href="https://code.claude.com/docs/en/headless">docs</a></td><td>9</td></tr>
+<tr><td><code>devcontainer exec --workspace-folder 폴더 [--remote-env 키=값] 명령</code></td><td>그 폴더의 dev container를 라벨로 찾아 <code>remoteUser</code>로 명령 실행 / 환경 변수를 더한다. <code>--container-id</code>로 직접 지정도 된다 <a href="https://code.visualstudio.com/docs/devcontainers/devcontainer-cli">docs</a></td><td>마무리</td></tr>
+<tr><td><code>docker run --mount type=volume|bind,source=…,target=…</code></td><td>마운트 하나를 키=값으로 지정. 여러 번 줄 수 있다. bind의 source가 없으면 오류 <a href="https://docs.docker.com/engine/storage/bind-mounts/">docs</a></td><td>마무리</td></tr>
+<tr><td><code>docker volume create 이름</code></td><td>named volume 만들기 <a href="https://docs.docker.com/reference/cli/docker/volume/create/">docs</a></td><td>마무리</td></tr>
+<tr><td><code>New-Item -ItemType Directory</code> / <code>Set-Content</code> / <code>Get-Content</code> / <code>Move-Item -Force</code> / <code>Get-ChildItem</code></td><td>PowerShell: 폴더 만들기 / 파일에 쓰기 / 내용 출력 / 옮기기(덮어쓰기) / 폴더 목록 <a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/">docs</a></td><td>마무리</td></tr>
+</table>
+
+<h2>devcontainer.json 키</h2>
+<table>
+<tr><th>키</th><th>뜻</th><th>회차</th></tr>
+<tr><td><code>image</code></td><td>컨테이너를 만들 이미지. image 방식에서 필수</td><td>6</td></tr>
+<tr><td><code>forwardPorts</code></td><td>늘 forward할 컨테이너 포트 목록</td><td>6</td></tr>
+<tr><td><code>containerEnv</code></td><td>컨테이너 자체에 넣는 환경 변수. 바꾸면 Rebuild해야 반영된다</td><td>6</td></tr>
+<tr><td><code>dockerComposeFile</code></td><td>Compose 파일 경로. <code>devcontainer.json</code>이 있는 폴더 기준</td><td>6</td></tr>
+<tr><td><code>service</code></td><td>VS Code가 붙을 서비스. Compose 방식에서 필수</td><td>6</td></tr>
+<tr><td><code>runServices</code></td><td>시작할 서비스 목록. 기본값은 전부</td><td>6</td></tr>
+<tr><td><code>workspaceFolder</code></td><td>VS Code가 컨테이너 안에서 열 경로. Compose 방식 기본값은 <code>/</code></td><td>6</td></tr>
+<tr><td><code>shutdownAction</code></td><td>창을 닫을 때 할 일. 기본값은 image 방식 <code>stopContainer</code>, Compose 방식 <code>stopCompose</code></td><td>6</td></tr>
+<tr><td><code>mounts</code></td><td>추가 마운트. 문자열 하나가 Docker <code>--mount</code> 값 문법(<code>source=…,target=…,type=volume</code>)</td><td>7</td></tr>
+<tr><td><code>customizations.vscode.extensions</code></td><td>컨테이너 안에 설치할 확장 ID 목록</td><td>7</td></tr>
+<tr><td><code>postCreateCommand</code></td><td>컨테이너를 처음 만든 뒤 실행할 명령. 새 볼륨 폴더의 <code>sudo chown</code>에 쓴다</td><td>6</td></tr>
+<tr><td><code>features</code></td><td>설치할 feature ID → 옵션 객체(없으면 <code>{}</code>). 바꾸면 Rebuild. 같은 폴더에 <code>devcontainer-lock.json</code>이 생겨 받은 버전·체크섬을 적는다</td><td>8</td></tr>
+<tr><td><code>remoteEnv</code></td><td>VS Code와 그 하위 프로세스(터미널 등)에만 넣는 환경 변수. Rebuild 없이 바꿀 수 있다. 모든 프로세스가 봐야 하면 <code>containerEnv</code></td><td>8</td></tr>
+<tr><td><code>${devcontainerId}</code></td><td>dev container마다 고유하고 Rebuild해도 같은 ID로 바뀌는 변수. 볼륨 이름을 프로젝트별로 나눌 때 쓴다</td><td>8</td></tr>
+</table>
+<p class="muted">출처: <a href="https://containers.dev/implementors/json_reference/">devcontainer.json reference</a></p>
+
+<nav class="lesson-nav"><a href="../lessons/0001-installation-and-structure.html">← 0회차 레슨</a><a href="../lessons/0011-finale.html">마무리 회차 레슨 →</a></nav>
+
+</main>
+</body>
+</html>

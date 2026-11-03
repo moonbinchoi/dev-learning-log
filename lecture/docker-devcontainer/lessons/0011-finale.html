@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>마무리 회차 · CLI, 파일 bind mount, 총정리</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+
+<h1>마무리 회차 · CLI, 파일 bind mount, 총정리</h1>
+<p class="subtitle">오늘의 성과: 남은 미확인 두 건을 실측으로 닫는다. 하나는 <code>devcontainer exec</code>가 VS Code가 띄운 컨테이너를 다시 쓰는지, 다른 하나는 볼륨 위에 파일 하나를 bind mount하면 어떻게 되는지다. 이어서 shop README를 리뷰 관점 목록으로 다듬고, 면접 질문을 총정리한다.</p>
+
+<p>9회차에는 호스트에서 <code>docker exec -u vscode -w /workspaces/shop-docker-devcontainer -e ENABLE_CLAUDEAI_MCP_SERVERS=false &lt;컨테이너&gt; claude -p …</code>로 컨테이너 Claude를 불렀다. 옵션 없는 <code>docker exec</code>는 컨테이너의 <code>Config.User</code>인 <code>root</code>로, 작업 폴더 <code>/</code>에서, <code>HOME=/root</code>로 돌았다. 그래서 <code>-u</code>·<code>-w</code>를 늘 줬다. 컨테이너 이름도 Rebuild 때마다 바뀌었다(<code>interesting_carson</code> → <code>clever_northcutt</code>). 용어는 <a href="../reference/glossary.html">용어집</a>을 따른다.</p>
+
+<h2>1. devcontainer CLI: 폴더로 컨테이너를 찾는다</h2>
+<ul>
+<li>Dev Container 명세의 공식 CLI다. npm 패키지 <code>@devcontainers/cli</code>로 설치하고, 명령 이름은 <code>devcontainer</code>다. (<a href="https://github.com/devcontainers/cli">devcontainers/cli</a>, <a href="https://code.visualstudio.com/docs/devcontainers/devcontainer-cli">VS Code: dev container CLI</a>) 2026-10-21 기준 최신은 0.89.0이다(<a href="https://www.npmjs.com/package/@devcontainers/cli">npm</a>).</li>
+<li>VS Code 문서는 설치할 때 의존성 하나를 빌드하느라 Python, Node.js 14 이상, C/C++이 필요하다고 적는다. 호스트에는 Node 24.19.0과 Python이 있다. C/C++ 도구가 없어서 설치가 실패할 수도 있다. 실패하면 출력을 붙여 넣는다.</li>
+<li>오늘 쓰는 하위 명령 두 개:
+<table class="wrap">
+<tr><th>명령</th><th>하는 일</th></tr>
+<tr><td><code>devcontainer up</code></td><td><code>devcontainer.json</code> 설정을 적용해 컨테이너를 띄운다. 오늘은 쓰지 않는다</td></tr>
+<tr><td><code>devcontainer exec</code></td><td><code>userEnvProbe</code>, <code>remoteUser</code>, <code>remoteEnv</code> 등을 적용해 컨테이너에서 명령을 실행한다</td></tr>
+</table>
+<p class="muted">출처: devcontainers/cli README의 명령 목록. 맞는 컨테이너가 없을 때 <code>exec</code>가 무엇을 하는지는 README에 없어서 실습 A에서 본다.</p></li>
+<li><b>컨테이너를 찾는 방법.</b> <code>exec</code>는 컨테이너 이름 대신 <b>라벨</b>로 찾는다. 라벨 <code>devcontainer.local_folder</code>(호스트 폴더)와 <code>devcontainer.config_file</code>(설정 파일 경로)가 <code>--workspace-folder</code>에서 계산한 값과 같은 컨테이너를 찾는다. Windows에서는 비교 전에 드라이브 문자만 소문자로 바꾼다. (CLI 소스 <a href="https://github.com/devcontainers/cli/blob/main/src/spec-node/utils.ts">src/spec-node/utils.ts</a>)</li>
+<li>지금 shop 컨테이너를 <code>docker inspect</code>로 보면 VS Code가 붙인 라벨이 이렇다.
+<pre><code>devcontainer.local_folder = e:\Study\Inflearn\projects\shop-docker-devcontainer
+devcontainer.config_file  = e:\Study\Inflearn\projects\shop-docker-devcontainer\.devcontainer\devcontainer.json</code></pre></li>
+<li><b><code>docker exec</code>와 다른 점.</b> 위 표처럼 <code>exec</code>는 <code>remoteUser</code>, <code>remoteEnv</code>, <code>userEnvProbe</code>(사용자 로그인 셸의 환경 변수를 읽어 오는 설정)를 적용한다. <code>-u</code>·<code>-w</code> 같은 옵션은 없다(CLI 소스 <a href="https://github.com/devcontainers/cli/blob/main/src/spec-node/devContainersSpecCLI.ts">devContainersSpecCLI.ts</a>의 옵션 목록). 환경 변수는 <code>--remote-env 키=값</code>으로 더한다.
+<table class="wrap">
+<tr><th>옵션</th><th>뜻</th></tr>
+<tr><td><code>--workspace-folder 경로</code></td><td>이 호스트 폴더의 dev container를 찾는다</td></tr>
+<tr><td><code>--container-id ID</code></td><td>라벨 대신 컨테이너 ID로 지정한다</td></tr>
+<tr><td><code>--remote-env 키=값</code></td><td>이 명령에만 환경 변수를 더한다(<code>docker exec -e</code> 자리)</td></tr>
+</table></li>
+</ul>
+
+<h3>문법 예시 (오늘 과제와 다른 Node 프로젝트)</h3>
+<pre><code># 호스트에 CLI를 전역으로 설치하고 확인
+npm install -g @devcontainers/cli
+devcontainer --version
+# C:\work\blog의 dev container를 라벨로 찾아, 환경 변수 CI=true를 더해, 그 안에서 npm test 실행
+devcontainer exec --workspace-folder C:\work\blog --remote-env CI=true npm test</code></pre>
+
+<h2>2. 볼륨 위에 파일 하나 bind mount</h2>
+<ul>
+<li><b>왜 궁금한가.</b> <code>CLAUDE_CONFIG_DIR</code>를 지정하면 <code>~/.claude</code> 아래 모든 파일이 그 폴더로 간다. (<a href="https://code.claude.com/docs/en/claude-directory">Explore the .claude directory</a>) 사용자 <code>CLAUDE.md</code>도 그렇다. shop 컨테이너에서는 <code>/home/vscode/.claude/CLAUDE.md</code>이고, 이 경로는 볼륨 <code>claude-code-config-…</code> <b>안</b>이다. 호스트의 파일 하나를 거기에 붙이면 컨테이너 Claude가 호스트와 같은 지침을 읽을까?</li>
+<li>문서로 확인한 것:
+<table class="wrap">
+<tr><th>사실</th><th>출처</th></tr>
+<tr><td>bind mount의 source는 파일이어도 된다. <code>--mount</code>로 줬는데 source가 없으면 오류다(<code>-v</code>는 폴더를 만든다)</td><td><a href="https://docs.docker.com/engine/storage/bind-mounts/">Bind mounts</a></td></tr>
+<tr><td>비어 있지 않은 경로에 bind mount하면 원래 내용은 가려진다</td><td>Bind mounts</td></tr>
+<tr><td>빈 볼륨을 이미지에 내용이 있는 경로에 붙이면 그 내용이 볼륨으로 복사된다</td><td><a href="https://docs.docker.com/engine/storage/volumes/">Volumes</a></td></tr>
+</table></li>
+<li><b>문서에 없는 것(오늘 잰다):</b> 마운트 대상 하나가 다른 마운트 대상 안에 있을 때의 순서와 결과. 호스트에서 파일을 고쳤을 때 컨테이너에 보이는지. 포럼에는 편집기가 새 파일을 만들어 바꿔치기하면 컨테이너가 옛 파일을 계속 본다는 보고가 있다. (<a href="https://forums.docker.com/t/sharing-a-single-file-via-a-volume-mount-does-not-work-as-expected/57088">Docker forum</a>) 공식 문서가 아니라서 확인 거리로 둔다.</li>
+</ul>
+
+<h3>문법 예시 (오늘 과제와 다른 경로)</h3>
+<pre><code># 볼륨 cache를 /cache에 붙이고, 호스트 파일 C:\cfg\app.ini를 그 안의 /cache/app.ini에 붙여, 그 내용을 출력
+docker run --rm `
+  --mount type=volume,source=cache,target=/cache `
+  --mount type=bind,source=C:\cfg\app.ini,target=/cache/app.ini `
+  alpine:3.22 cat /cache/app.ini
+
+# PowerShell 파일 명령 (C:\tmp 예시)
+New-Item -ItemType Directory C:\tmp\demo          # 폴더 만들기
+Set-Content C:\tmp\demo\a.txt "hello"             # a.txt에 hello를 쓴다(없으면 만든다)
+Get-Content C:\tmp\demo\a.txt                     # 내용 출력
+Move-Item -Force C:\tmp\demo\a.txt C:\tmp\b.txt   # 옮기기. b.txt가 있으면 덮어쓴다
+Get-ChildItem C:\tmp\demo                         # 폴더 안 목록
+
+# 컨테이너 안 셸로 두 명령을 한 번에: >>는 끝에 덧붙이기, >는 새로 쓰기
+docker exec web sh -c "echo line >> /tmp/log.txt; echo new > /tmp/x.txt"</code></pre>
+<p class="muted"><code>--mount</code> 값은 쉼표로 이은 <code>키=값</code>이다. shop <code>devcontainer.json</code>의 <code>mounts</code> 문자열과 같은 문법이다. (<a href="https://docs.docker.com/engine/storage/bind-mounts/#options-for---mount">Bind mounts, Options for --mount</a>)</p>
+
+<h2>3. README 리뷰 관점</h2>
+<p>9회차에는 README를 읽고 "고칠 것 없음"이라고 했다. 리뷰는 틀린 문장만 찾는 일이 아니다. 아래 네 관점으로 한 번씩 훑는다.</p>
+<table class="wrap">
+<tr><th>관점</th><th>묻는 것</th></tr>
+<tr><td>근거</td><td>문장마다 저장소 파일이나 실측이 뒷받침하는가. 뒷받침이 없으면 지우거나 근거를 단다</td></tr>
+<tr><td>호스트만 아는 맥락</td><td>컨테이너 Claude가 몰랐던 사실(포트를 고른 이유, VS Code 사용자 설정, worktree를 만든 방식)이 맞게 들어갔는가</td></tr>
+<tr><td>앞 실측과의 대조</td><td>7~9회차에 잰 사실과 맞는가. 처음 쓰는 사람이 부딪힐 실측 결과가 빠지지 않았는가</td></tr>
+<tr><td>독자</td><td>처음 clone한 사람이 이 README만 보고 열고, 빌드하고, 로그인할 수 있는가</td></tr>
+</table>
+<p>대조할 실측(7~9회차):</p>
+<ul>
+<li>컨테이너에서 처음 <code>claude</code>를 실행하면 로그인한다. 브라우저 콜백이 컨테이너에 닿지 않으면 브라우저에 나온 코드를 터미널의 <code>Paste code here if prompted</code>에 붙여 넣는다.</li>
+<li>Dev Containers는 사용자 <code>.gitconfig</code>만 컨테이너로 복사한다. 호스트 시스템 설정의 <code>core.autocrlf=true</code>는 따라오지 않아서, <code>.gitattributes</code> 맨 위에 <code>* text=auto eol=lf</code>를 두었다.</li>
+<li>worktree는 <code>git worktree add --relative-paths</code>로 만들었다. <code>.git</code> 파일에 상대 경로가 적힌다.</li>
+<li><code>java:25-trixie</code> 이미지에는 Node가 없다. Claude Code feature의 자동 Node 설치가 실패해서 Node feature를 함께 넣었다.</li>
+<li>호스트에서 <code>docker exec</code>로 들어가면 <code>root</code>다. <code>-u vscode</code>를 줘야 한다.</li>
+<li><code>${devcontainerId}</code>는 Rebuild해도 바뀌지 않는다.</li>
+</ul>
+
+<h2>4. 면접 질문 총정리</h2>
+<p>회차마다 나온 질문이다. 각 질문에 "무엇"이 아니라 "왜"까지 답할 수 있는지 스스로 점검한다. ●는 답에 빈칸이 남았던 질문이다. 오늘은 채팅에서 그중 몇 개를 다시 묻는다.</p>
+<table class="wrap">
+<tr><th>회차</th><th>질문</th></tr>
+<tr><td>0</td><td>이미지와 컨테이너는 어떻게 다른가? 컨테이너와 VM은?</td></tr>
+<tr><td>1</td><td><code>docker exec</code>와 <code>docker run</code>은 어떻게 다른가?</td></tr>
+<tr><td>2</td><td>named volume과 bind mount는 언제 각각 쓰나?</td></tr>
+<tr><td>3</td><td>publish와 <code>EXPOSE</code>는 어떻게 다른가?</td></tr>
+<tr><td>4</td><td>Dockerfile 명령 순서가 왜 빌드 속도를 바꾸나?</td></tr>
+<tr><td>5 ●</td><td>Compose 프로젝트 이름은 무엇을 바꾸나? <code>depends_on</code>만으로 DB 접속 준비가 보장되나?</td></tr>
+<tr><td>6 ●</td><td>Docker로 앱 이미지를 실행하는 것과 dev container는 무엇이 다른가?</td></tr>
+<tr><td>7 ●</td><td>브랜치란 무엇이고, 두 worktree에서 같은 브랜치를 꺼낼 수 없는 이유는?</td></tr>
+<tr><td>8 ●</td><td>컨테이너로 격리해도 막지 못하는 것은? <code>CLAUDE_CONFIG_DIR</code>는 왜 필요한가?</td></tr>
+<tr><td>9 ●</td><td>무인 실행의 성공은 무엇으로 판정하나? 왜 권한을 최소로 주나?</td></tr>
+</table>
+
+<h2>5. 오늘 쓰는 명령</h2>
+<p>모두 <b>호스트</b> VS Code 창(이 강의 창)의 터미널 <code>lab</code>(PowerShell)에서 친다.</p>
+<table class="wrap">
+<tr><th>명령</th><th>하는 일</th></tr>
+<tr><td><code>npm install -g 패키지</code></td><td>npm 패키지를 전역으로 설치해 어느 폴더에서나 명령을 쓴다 (<a href="https://docs.npmjs.com/cli/commands/npm-install">npm install</a>)</td></tr>
+<tr><td><code>devcontainer exec --workspace-folder 폴더 명령</code></td><td>그 폴더의 실행 중인 dev container에서 명령 실행</td></tr>
+<tr><td><code>New-Item -ItemType Directory 이름</code></td><td>폴더 만들기 (<a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-item">New-Item</a>)</td></tr>
+<tr><td><code>Set-Content 파일 "내용"</code> / <code>Get-Content 파일</code></td><td>파일에 내용 쓰기(없으면 만든다) / 파일 내용 출력 (<a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/set-content">Set-Content</a>)</td></tr>
+<tr><td><code>Move-Item -Force 원본 대상</code></td><td>파일 옮기기. 대상이 있으면 덮어쓴다 (<a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/move-item">Move-Item</a>)</td></tr>
+<tr><td><code>docker volume create 이름</code></td><td>named volume 만들기 (<a href="https://docs.docker.com/reference/cli/docker/volume/create/">docs</a>)</td></tr>
+<tr><td><code>Get-ChildItem 폴더</code></td><td>폴더 안 목록 (<a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-childitem">Get-ChildItem</a>)</td></tr>
+<tr><td><code>docker run --mount type=…,source=…,target=…</code></td><td>마운트 하나. 여러 번 줄 수 있다 (<a href="https://docs.docker.com/reference/cli/docker/container/run/#mount">docs</a>)</td></tr>
+<tr><td><code>docker exec N sh -c "명령; 명령"</code></td><td>컨테이너 안 셸로 명령 여러 개를 한 번에. <code>&gt;&gt;</code>는 파일 끝에 덧붙이기, <code>&gt;</code>는 새로 쓰기 (<a href="https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_07">셸 리다이렉션</a>)</td></tr>
+<tr><td><code>ls -l 폴더</code></td><td>컨테이너 안 폴더의 파일과 크기·소유자 (<a href="https://www.gnu.org/software/coreutils/manual/html_node/ls-invocation.html">ls</a>)</td></tr>
+</table>
+
+<h2>6. 실습 — 예측하고 직접 친다</h2>
+<p class="muted">시간 배분: A 15분, B 20분, C 10분, 면접 10분.</p>
+<div class="note">명령마다 먼저 <code>Clear-Host</code>를 치고, 출력은 <code>@terminal:lab</code>으로 붙인다. shop 컨테이너가 꺼져 있으면 <code>code -n E:\Study\Inflearn\projects\shop-docker-devcontainer</code>로 실습 창을 열어 켠다.</div>
+
+<h3>A. <code>devcontainer exec</code>가 VS Code의 컨테이너를 쓰는지</h3>
+<ol class="steps">
+<li>
+<p>CLI를 설치하고 버전을 본다.</p>
+<pre><code>npm install -g @devcontainers/cli
+devcontainer --version</code></pre>
+</li>
+<li>
+<p>worktree 폴더를 변수에 담고, 사용자·작업 폴더·<code>HOME</code>을 본다. 이어서 컨테이너 목록을 본다.</p>
+<pre><code>$wt = "E:\Study\Inflearn\projects\shop-docker-devcontainer"
+devcontainer exec --workspace-folder $wt whoami
+devcontainer exec --workspace-folder $wt pwd
+devcontainer exec --workspace-folder $wt printenv HOME
+docker ps -a --format "{{.Names}}  {{.Status}}"</code></pre>
+<div class="predict">재료: 1절의 라벨 값과 찾는 방법(드라이브 문자만 소문자로 바꿔 비교). CLI README가 말하는 <code>remoteUser</code> 적용. shop의 <code>remoteUser</code>는 이미지 라벨에서 온 <code>vscode</code>이고, worktree는 컨테이너의 <code>/workspaces/shop-docker-devcontainer</code>에 붙어 있다. 지금 <code>docker ps -a</code>에는 <code>clever_northcutt</code> 하나만 있다. <code>whoami</code>와 <code>printenv HOME</code>은 무엇을 출력할까? 명령 뒤 컨테이너는 몇 개일까?</div>
+<p>확인 거리: <code>pwd</code>. CLI 소스에는 컨테이너의 작업 공간 폴더에서 실행한다고 되어 있다. 문서에는 없어서 결과로 본다.</p>
+</li>
+<li>
+<p>같은 명령을 main worktree(<code>projects\shop</code>, 브랜치 <code>master</code>)에 친다. 이 폴더에도 <code>.devcontainer/devcontainer.json</code>이 있지만, 이 폴더로 연 컨테이너는 없다.</p>
+<pre><code>devcontainer exec --workspace-folder E:\Study\Inflearn\projects\shop whoami
+docker ps -a --format "{{.Names}}  {{.Status}}"</code></pre>
+<div class="predict">이 폴더의 라벨을 단 컨테이너는 없다. <code>exec</code>가 컨테이너를 새로 만들까, 오류로 끝날까? 컨테이너 수는 바뀔까? (문서에 없어서 실측으로 정한다)</div>
+</li>
+<li>
+<p>9회차에 <code>-e</code>로 주던 환경 변수를 <code>--remote-env</code>로 준다.</p>
+<pre><code>devcontainer exec --workspace-folder $wt --remote-env ENABLE_CLAUDEAI_MCP_SERVERS=false printenv ENABLE_CLAUDEAI_MCP_SERVERS CLAUDE_CONFIG_DIR</code></pre>
+<div class="predict">재료: <code>CLAUDE_CONFIG_DIR=/home/vscode/.claude</code>는 <code>containerEnv</code>에 있다. <code>printenv</code>는 정의된 이름만 한 줄씩 출력한다. 몇 줄이 나오고, 각각 무엇일까?</div>
+<p>결과를 놓고 Claude와 이야기한다. 9회차 명령을 CLI로 바꾸면 어떻게 되나? 어느 쪽을 쓰겠나?</p>
+</li>
+</ol>
+
+<h3>B. 볼륨 위에 파일 하나 bind mount</h3>
+<p>shop 설정은 바꾸지 않는다. docker-lab 폴더에서 버리는 컨테이너로 잰다.</p>
+<ol class="steps" start="5">
+<li>
+<p>위에서부터: docker-lab으로 이동, 시험 폴더와 파일 만들기, 빈 볼륨 <code>lab-vol</code> 만들기, 볼륨을 <code>/data</code>에 붙이고 호스트 파일을 <code>/data/note.md</code>에 붙여 30분 동안 켜 두기. <code>alpine:3.22</code>는 로컬에 없어서 처음 한 번 내려받는다.</p>
+<pre><code>cd E:\Study\Inflearn\projects\docker-lab
+New-Item -ItemType Directory mount-test
+Set-Content mount-test\note.md "v1 from host"
+docker volume create lab-vol
+docker run -d --name mount-test `
+  --mount type=volume,source=lab-vol,target=/data `
+  --mount type=bind,source=E:\Study\Inflearn\projects\docker-lab\mount-test\note.md,target=/data/note.md `
+  alpine:3.22 sleep 1800</code></pre>
+<p class="muted">줄 끝 <code>`</code>는 PowerShell의 줄 잇기다. 뒤에 공백이나 주석이 오면 안 된다. 네 줄을 한꺼번에 붙여 넣는다.</p>
+</li>
+<li>
+<p>컨테이너 안에서 <code>note.md</code> 내용과 <code>/data</code> 목록을 본다.</p>
+<pre><code>docker exec mount-test cat /data/note.md
+docker exec mount-test ls -l /data</code></pre>
+<div class="predict">컨테이너는 <code>v1 from host</code>를 볼까? <code>/data</code>에는 무엇이 있을까?</div>
+</li>
+<li>
+<p>컨테이너 안에서 <code>note.md</code>에 한 줄을 덧붙이고, 새 파일 <code>other.txt</code>를 만든다. 그다음 호스트에서 본다.</p>
+<pre><code>docker exec mount-test sh -c "echo from-container >> /data/note.md; echo hi > /data/other.txt"
+Get-Content mount-test\note.md
+Get-ChildItem mount-test</code></pre>
+<div class="predict">덧붙인 줄은 호스트 파일에 보일까? <code>other.txt</code>는 호스트의 <code>mount-test</code> 폴더에 생길까, 다른 곳에 생길까?</div>
+</li>
+<li>
+<p>호스트에서 같은 파일에 바로 쓴다.</p>
+<pre><code>Set-Content mount-test\note.md "v2 written directly"
+docker exec mount-test cat /data/note.md</code></pre>
+<div class="predict">컨테이너는 v2를 볼까?</div>
+</li>
+<li>
+<p>이번에는 새 파일을 만들어 바꿔치기한다. 편집기가 저장할 때 이렇게 하는 경우가 있다는 보고가 있다.</p>
+<pre><code>Set-Content mount-test\note.tmp "v3 replaced"
+Move-Item -Force mount-test\note.tmp mount-test\note.md
+Get-Content mount-test\note.md
+docker exec mount-test cat /data/note.md</code></pre>
+<div class="predict">재료: 2절의 포럼 보고(공식 문서 아님). 호스트는 v3를 보고, 컨테이너는 무엇을 볼까?</div>
+</li>
+<li>
+<p>컨테이너를 지우고, 볼륨만 붙인 새 컨테이너로 볼륨 안을 본다.</p>
+<pre><code>docker rm -f mount-test
+docker run --rm --mount type=volume,source=lab-vol,target=/data alpine:3.22 ls -l /data</code></pre>
+<div class="predict">볼륨에 <code>other.txt</code>가 있을까? <code>note.md</code>는 있을까, 있다면 크기는?</div>
+<p>결과를 놓고 이야기한다. shop의 <code>/home/vscode/.claude/CLAUDE.md</code>에 호스트 파일을 붙일 가치가 있나? 붙인다면 무엇을 조심해야 하나?</p>
+</li>
+</ol>
+
+<h3>C. README 리뷰</h3>
+<ol class="steps" start="11">
+<li>
+<p>README를 연다. 3절의 네 관점(근거, 호스트만 아는 맥락, 앞 실측과의 대조, 독자)으로 훑고, 고칠 곳을 목록으로 말한다.</p>
+<pre><code>code E:\Study\Inflearn\projects\shop-docker-devcontainer\README.md</code></pre>
+<p>고칠 곳을 정하면 사용자가 직접 고치고 Claude가 리뷰한다. 커밋은 사용자가 한다. 시간이 모자라면 고칠 목록만 정하고 다음에 고친다.</p>
+</li>
+</ol>
+
+<h2>7. 정리</h2>
+<ul>
+<li>지울 것: 컨테이너 <code>mount-test</code>(10단계에서 지움), 볼륨 <code>lab-vol</code>, 폴더 <code>docker-lab\mount-test</code>, 이미지 <code>alpine:3.22</code>. CLI를 계속 쓸지는 끝에 정한다(<code>npm uninstall -g @devcontainers/cli</code>).</li>
+<li>남길 것: shop worktree와 브랜치 <code>docker-devcontainer</code>, 컨테이너 <code>clever_northcutt</code>, 볼륨 <code>claude-code-config-…</code>·<code>shop-gradle-home</code>·<code>vscode</code>.</li>
+<li>오늘 잰 결과는 강의 기록에 남긴다. 조사 문서 <code>docs/research/devcontainer-claude.md</code>의 미확인 6(<code>devcontainer exec</code>가 VS Code의 컨테이너를 다시 쓰는지)과 7(볼륨 위에 파일 하나 bind mount)을 닫는 근거가 된다.</li>
+</ul>
+
+<h2>더 읽을 것</h2>
+<p>1차 자료: <a href="https://code.visualstudio.com/docs/devcontainers/devcontainer-cli">VS Code: dev container CLI</a>. 이어서 <a href="https://github.com/devcontainers/cli">devcontainers/cli README</a>의 명령 표를 본다.</p>
+
+<div class="note">막히거나 출력이 예측과 다르면 출력을 붙여 넣고 물어보세요. Claude가 이 과정의 선생님입니다.</div>
+
+<nav class="lesson-nav">
+<a href="0010-host-container-handoff.html">← 9회차 · 호스트↔컨테이너 인수인계</a>
+<a href="../reference/glossary.html">용어집 →</a>
+</nav>
+
+</main>
+</body>
+</html>

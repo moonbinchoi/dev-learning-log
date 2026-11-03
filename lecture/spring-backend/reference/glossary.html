@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>스프링 백엔드 용어집</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>용어집</h1>
+<p class="subtitle">spring-backend 트랙의 모든 레슨은 이 용어를 쓴다. 처음 나온 회차를 괄호에 적는다.</p>
+
+<table class="wrap">
+<thead><tr><th>용어</th><th>뜻</th></tr></thead>
+<tbody>
+<tr id="model"><td>모델</td><td>컨트롤러가 뷰(템플릿)에 넘기는 데이터 묶음. <code>model.addAttribute("item", item)</code>으로 넣으면 템플릿에서 <code>${item}</code>으로 읽는다. 리다이렉트하면 사라진다. (1회차)</td></tr>
+<tr id="domain-object"><td>도메인 객체</td><td>서비스가 다루는 핵심 대상을 나타내는 객체. 예: <code>Item</code>. 폼 객체와 구분한다. (1회차)</td></tr>
+<tr id="path-variable"><td>경로 변수</td><td>URL 경로 안의 <code>{이름}</code> 자리(URI 템플릿 변수). <code>/items/{itemId}</code>의 <code>itemId</code>. 컨트롤러에서 <code>@PathVariable</code>로 받는다. (1회차)</td></tr>
+<tr id="prg"><td>PRG (Post/Redirect/Get)</td><td>POST를 처리한 뒤 뷰를 바로 그리지 않고 리다이렉트로 응답해, 브라우저가 결과 페이지를 GET으로 다시 요청하게 하는 패턴. 새로고침해도 POST가 다시 전송되지 않는다. (1회차)</td></tr>
+<tr id="redirect"><td>리다이렉트</td><td>서버가 "이 주소로 다시 요청하라"고 응답하고, 브라우저가 그 주소로 새 요청을 보내는 것. 컨트롤러에서 뷰 이름 앞에 <code>redirect:</code>를 붙인다. (1회차)</td></tr>
+<tr id="query-param"><td>쿼리 파라미터</td><td>URL의 <code>?</code> 뒤 <code>이름=값</code> 쌍. 예: <code>/items/1?status=true</code>. 템플릿에서 <code>${param.이름}</code>으로 읽는다. (1회차)</td></tr>
+<tr id="command-object"><td>커맨드 객체</td><td><code>th:object</code>로 폼에 지정한 객체. 폼의 각 칸이 이 객체의 필드에 대응한다. (1회차)</td></tr>
+<tr id="selection-expr"><td>선택 변수 식</td><td><code>*{필드}</code>. <code>th:object</code>로 고른 객체의 필드를 가리킨다. <code>*{itemName}</code> = <code>${item.itemName}</code>. (1회차)</td></tr>
+<tr id="binding"><td>바인딩</td><td>요청 파라미터(문자열)를 객체 필드의 타입으로 바꿔 넣는 것. <code>@ModelAttribute</code>가 한다. (1회차)</td></tr>
+<tr id="binding-result"><td><code>BindingResult</code></td><td>바인딩·검증 오류를 담는 객체. <code>@ModelAttribute</code> 파라미터 바로 다음에 두면 오류가 나도 컨트롤러가 호출된다. 모델에 자동으로 담긴다. (1회차)</td></tr>
+<tr id="field-error"><td><code>FieldError</code></td><td>특정 필드 하나의 오류. 사용자가 입력한 값(<code>rejectedValue</code>)을 함께 보관해서, 폼을 다시 그릴 때 입력값이 남는다. (1회차)</td></tr>
+<tr id="type-mismatch"><td><code>typeMismatch</code></td><td>바인딩에서 타입 변환이 실패했을 때 스프링이 만드는 <code>FieldError</code>의 오류 코드. 예: 숫자 칸에 <code>abc</code>. (1회차)</td></tr>
+<tr id="bean-validation"><td>Bean Validation</td><td>필드에 <code>@NotBlank</code>·<code>@Max</code> 같은 애너테이션을 달아 검증 규칙을 선언하는 표준(Jakarta Validation). 구현체는 Hibernate Validator. (1회차)</td></tr>
+<tr id="form-object"><td>폼 객체</td><td>폼 데이터를 받기 위해서만 만든 객체(<code>ItemSaveForm</code>, <code>ItemUpdateForm</code>). 도메인 객체(<code>Item</code>)와 분리한다. (1회차)</td></tr>
+</tbody>
+</table>
+
+<nav class="lesson-nav">
+<a href="../lessons/0001-item-form-validation.html">1회차 레슨</a>
+<a href="form-validation.html">폼·검증 요약</a>
+</nav>
+</main>
+</body>
+</html>

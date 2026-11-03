@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>9회차 · 호스트↔컨테이너 인수인계</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+
+<h1>9회차 · 호스트↔컨테이너 인수인계</h1>
+<p class="subtitle">오늘의 성과: 호스트 터미널에서 명령 하나로 컨테이너 Claude에게 이슈 파일을 맡긴다. 컨테이너 Claude가 커밋한 결과를 호스트에서 <code>git</code>으로 리뷰하고, 같은 세션에 후속 지시를 보낸다. 결과물은 shop의 <code>README.md</code>다.</p>
+
+<p>8회차에 shop dev container(worktree <code>projects/shop-docker-devcontainer</code>, 브랜치 <code>docker-devcontainer</code>)에 Claude Code를 넣고 로그인했다. 로그인 정보는 볼륨 <code>claude-code-config-…</code>에 있고, <code>containerEnv</code>의 <code>CLAUDE_CONFIG_DIR=/home/vscode/.claude</code>가 그 볼륨을 가리킨다. 오늘은 그 컨테이너 Claude를 사람 대신 호스트가 부른다. 용어는 <a href="../reference/glossary.html">용어집</a>을 따른다.</p>
+
+<h2>1. 왜 파일과 git으로 넘기나</h2>
+<ul>
+<li>호스트 Claude와 컨테이너 Claude는 서로 메시지를 보낼 수 없다. 문서는 "A session inside a container and a session on the host can't reach each other"라고 적는다. (<a href="https://code.claude.com/docs/en/cross-session-messaging">Cross-session messaging</a>)</li>
+<li>둘이 함께 보는 것은 bind mount된 프로젝트 폴더다. 컨테이너에서 고친 파일은 호스트 디스크의 실제 파일이다. (<a href="https://code.claude.com/docs/en/devcontainer">Development containers</a>, 첫 문단) 커밋도 bind mount된 common dir(<code>projects\shop\.git</code> → <code>/workspaces/shop/.git</code>)에 쌓이므로 호스트 <code>git</code>이 바로 본다.</li>
+<li>그래서 흐름은 이렇다.
+<ol>
+<li>호스트 Claude가 프로젝트 안 <b>이슈 파일</b>에 요구사항과 완료 기준을 쓴다.</li>
+<li>사람이 호스트 터미널에서 <code>docker exec … claude -p …</code>로 컨테이너 Claude를 부른다.</li>
+<li>컨테이너 Claude가 브랜치에 커밋하고 보고 파일을 쓴다.</li>
+<li>호스트에서 <code>git</code>으로 리뷰하고, 후속 지시는 <code>--resume</code>으로 같은 세션에 보낸다.</li>
+</ol></li>
+</ul>
+
+<h2>2. <code>docker exec</code>로 컨테이너 안에 띄우기</h2>
+<p>1회차의 <code>docker exec</code>는 실행 중인 컨테이너에 프로세스를 하나 더 띄운다. 오늘은 옵션 세 개를 더 쓴다. (<a href="https://docs.docker.com/reference/cli/docker/container/exec/">docker exec</a>)</p>
+<table class="wrap">
+<tr><th>옵션</th><th>뜻</th><th>안 주면</th></tr>
+<tr><td><code>-u 사용자</code></td><td>그 사용자로 실행</td><td>문서의 기본값 칸이 비어 있다. 실습 A에서 잰다</td></tr>
+<tr><td><code>-w 경로</code></td><td>그 폴더에서 실행</td><td>"컨테이너를 만들 때 정한 작업 폴더"</td></tr>
+<tr><td><code>-e 키=값</code></td><td>이 프로세스에만 환경 변수를 더한다</td><td>컨테이너를 만들 때의 환경 변수만 물려받는다</td></tr>
+</table>
+<ul>
+<li>8회차 실측: <code>docker exec … printenv</code>에 <code>containerEnv</code> 값은 나오고 <code>remoteEnv</code> 값은 나오지 않았다. 위 표 마지막 칸과 맞는다. 그래서 <code>CLAUDE_CONFIG_DIR</code>는 <code>docker exec</code>로 띄운 <code>claude</code>에도 보인다.</li>
+<li><code>remoteUser</code>(<code>vscode</code>)는 VS Code가 터미널과 도구를 띄울 때 쓰는 사용자다. (<a href="https://containers.dev/implementors/json_reference/">devcontainer.json reference</a>) <code>docker exec</code>는 VS Code를 거치지 않는다.</li>
+<li>지금 shop 컨테이너를 <code>docker inspect</code>로 보면 <code>Config.User</code>가 <code>"root"</code>, <code>Config.WorkingDir</code>가 <code>""</code>(비어 있음)다. worktree 폴더는 <code>/workspaces/shop-docker-devcontainer</code>에 붙어 있다.</li>
+</ul>
+
+<h2>3. <code>claude -p</code>: 대화 없이 한 번 실행</h2>
+<ul>
+<li><code>-p</code>(<code>--print</code>)는 프롬프트 하나를 받아 끝까지 일하고 결과를 출력한 뒤 끝난다. 성공하면 종료 코드 0이다. (<a href="https://code.claude.com/docs/en/headless">Run Claude Code programmatically</a>)</li>
+<li><code>--output-format json</code>을 주면 결과를 JSON 한 덩어리로 낸다. 오늘 읽을 필드:
+<table class="wrap">
+<tr><th>필드</th><th>뜻</th></tr>
+<tr><td><code>result</code></td><td>Claude의 마지막 답</td></tr>
+<tr><td><code>session_id</code></td><td>이 대화의 ID. 이어서 시킬 때 쓴다</td></tr>
+<tr><td><code>is_error</code></td><td>실패했는지</td></tr>
+<tr><td><code>num_turns</code></td><td>도구를 쓰며 오간 횟수</td></tr>
+<tr><td><code>total_cost_usd</code></td><td>추정 비용</td></tr>
+<tr><td><code>permission_denials</code></td><td>권한이 없어 거부된 도구 호출 목록</td></tr>
+</table>
+<p class="muted">headless 문서는 <code>result</code>·<code>session_id</code>·비용만 직접 적는다. 나머지 이름은 <a href="https://code.claude.com/docs/en/agent-sdk/typescript">Agent SDK</a>의 결과 메시지 타입에서 가져왔다. CLI 출력에 실제로 있는지는 실습 C에서 확인한다.</p></li>
+<li><b><code>-p</code>의 시작 모드는 대화형과 다르다.</b> v2.1.302 이상에서 아무것도 모드를 정하지 않으면 <code>-p</code>는 <b>Manual</b>(<code>default</code>)로 시작한다. Manual에서 승인이 필요한 호출은 승인해 줄 것이 없으면 <b>거부된다</b>. (headless 문서, "Auto-approve tools") 8회차에 대화형 세션이 <code>auto</code>로 시작한 것과 다르다. 컨테이너의 Claude Code는 2.1.304다.</li>
+<li>미리 허락하는 방법 두 가지:
+<table class="wrap">
+<tr><th>옵션</th><th>하는 일</th></tr>
+<tr><td><code>--allowedTools "규칙,규칙"</code></td><td>나열한 도구만 묻지 않고 허용. <code>Bash(git commit *)</code>는 <code>git commit</code>으로 시작하는 명령. <code>*</code> 앞 공백이 단어 경계를 만든다. 공백이 없으면 <code>git commit-tree</code>처럼 이어 붙은 명령도 잡힌다</td></tr>
+<tr><td><code>--permission-mode auto</code></td><td>분류기가 검사하고 통과한 것은 다 허용. <code>-p</code>에서도 같은 옵션이 동작한다</td></tr>
+</table>
+<p class="muted">출처: headless 문서 "Auto-approve tools", <a href="https://code.claude.com/docs/en/permission-modes">Permission modes</a></p></li>
+<li><code>--permission-prompts none</code>은 print mode에서 승인 요청에 답할 사람이 없다고 알린다. v2.1.259 이상에 있다. (<a href="https://code.claude.com/docs/en/cli-reference">CLI reference</a>, headless 문서 "Turn off permission prompts in unattended runs") 오늘은 쓰지 않고, 컨테이너의 2.1.304 도움말에 나오는지만 본다.</li>
+<li><code>-p</code>는 신뢰 확인 없이 프로젝트의 <code>.claude/settings.json</code> hook과 <code>.mcp.json</code> 서버를 실행한다. (headless 문서, <code>--bare</code> 절) shop에는 둘 다 없다. 이것을 끄는 <code>--bare</code>는 구독 로그인을 쓰지 않고 API 키를 요구하므로 오늘은 쓰지 않는다.</li>
+</ul>
+
+<h3>문법 예시 (오늘 과제와 다른 Node 프로젝트)</h3>
+<pre><code>docker exec -u node -w /workspaces/blog web-dev `   # node 사용자로, 그 폴더에서, 컨테이너 web-dev 안에
+  claude -p "Fix the failing test in test/date.test.js" `   # 대화 없이 한 번
+  --allowedTools "Edit,Bash(npm test *)" `                  # 수정과 npm test만 허용
+  --output-format json                                      # 결과를 JSON으로</code></pre>
+<p class="muted">줄 끝 <code>`</code>는 PowerShell의 줄 잇기다. <code>#</code> 주석은 설명용이다. 실제로 칠 때는 한 줄로 친다.</p>
+
+<h2>4. 세션 이어가기와 PowerShell로 JSON 읽기</h2>
+<ul>
+<li>세션 기록은 설정 폴더 아래 <code>projects/&lt;작업 폴더 경로&gt;/&lt;session-id&gt;.jsonl</code>에 저장된다. <code>CLAUDE_CONFIG_DIR</code>를 지정하면 그 폴더가 바뀐다. (<a href="https://code.claude.com/docs/en/sessions">Sessions</a>) shop 컨테이너에서는 볼륨 안이다.</li>
+<li><code>claude -p "다음 지시" --resume &lt;session_id&gt;</code>는 그 대화에 이어서 시킨다. (headless 문서, "Continue conversations")</li>
+<li>이어 간 <code>-p</code> 실행은 새 <code>-p</code> 실행과 같은 권한 모드로 시작한다. 앞 실행에 준 권한 옵션은 다시 줘야 한다. (Sessions)</li>
+<li>PowerShell에서는 출력을 <code>ConvertFrom-Json</code>에 넘기면 필드를 <code>$r.session_id</code>처럼 읽는다. (<a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/convertfrom-json">ConvertFrom-Json</a>)</li>
+<li>실습 C의 첫 줄 <code>[Console]::OutputEncoding = [Text.Encoding]::UTF8</code>은 이 터미널이 외부 프로그램 출력을 UTF-8로 읽게 맞춘다. <code>claude</code>의 출력은 UTF-8이다. 맞추지 않으면 <code>result</code>의 한글이 깨질 수 있다고 보고 미리 친다(확인하지 않았다).</li>
+</ul>
+
+<h3>문법 예시: 이어서 시키기 (같은 Node 프로젝트)</h3>
+<pre><code>$a =claude -p "List the TODOs in src/" --output-format json | ConvertFrom-Json   # 첫 실행, 객체로 받기
+$a.session_id                                                                      # 그 대화의 ID 출력
+$b = claude -p "Now fix the first one" --resume $a.session_id `                   # 같은 대화에 이어서
+  --allowedTools "Edit" --output-format json | ConvertFrom-Json                    # 권한 옵션은 다시 준다
+$b.result                                                                          # 마지막 답만 출력</code></pre>
+
+<h2>5. 계정 커넥터</h2>
+<p>8회차에 확인했듯 로그인하면 claude.ai 계정의 커넥터(Claude Docs·Gmail·Notion)가 컨테이너 Claude에도 들어온다. 사람이 보지 않는 실행에서 끄는 방법은 둘이다. (<a href="https://code.claude.com/docs/en/mcp">MCP</a>, "Use MCP servers from Claude.ai")</p>
+<table class="wrap">
+<tr><th>방법</th><th>범위</th></tr>
+<tr><td>환경 변수 <code>ENABLE_CLAUDEAI_MCP_SERVERS=false</code></td><td>그 프로세스만. <code>docker exec -e</code>로 준다</td></tr>
+<tr><td>설정 <code>"disableClaudeAiConnectors": true</code></td><td>그 설정 파일이 적용되는 모든 세션. 어느 범위든 <code>true</code>가 이긴다</td></tr>
+</table>
+<p>오늘 명령은 첫 번째 방법을 쓴다. 파일을 바꾸지 않고 오늘 실행에만 적용된다.</p>
+
+<h2>6. 오늘 쓰는 명령</h2>
+<p>모두 <b>호스트</b> VS Code 창(이 강의 창)의 터미널 <code>lab</code>(PowerShell)에서 친다.</p>
+<table class="wrap">
+<tr><th>명령</th><th>하는 일</th></tr>
+<tr><td><code>docker ps --format "{{.Names}}  {{.Status}}"</code></td><td>실행 중인 컨테이너의 이름과 상태만 한 줄씩 (<a href="https://docs.docker.com/reference/cli/docker/container/ls/#format">docker ps --format</a>)</td></tr>
+<tr><td><code>$c = "이름"</code></td><td>PowerShell 변수에 컨테이너 이름을 담는다. 뒤 명령에서 <code>$c</code>로 쓴다</td></tr>
+<tr><td><code>docker exec $c whoami</code></td><td>그 컨테이너 안에서 실행한 사용자 이름</td></tr>
+<tr><td><code>docker exec $c pwd</code></td><td>그 프로세스의 작업 폴더</td></tr>
+<tr><td><code>docker exec … claude --help | Select-String 문자열</code></td><td>도움말 중 그 문자열이 든 줄만 (<a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/select-string">Select-String</a>)</td></tr>
+<tr><td><code>[Console]::OutputEncoding = [Text.Encoding]::UTF8</code></td><td>외부 프로그램 출력을 UTF-8로 읽게 한다. 이 터미널에서 한 번</td></tr>
+<tr><td><code>$r = 명령 | ConvertFrom-Json</code></td><td>JSON 출력을 객체로 바꿔 <code>$r</code>에 담는다</td></tr>
+<tr><td><code>$r | Format-List 필드, 필드</code></td><td>그 필드만 한 줄씩 (<a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/format-list">Format-List</a>)</td></tr>
+<tr><td><code>git -C 폴더 명령</code></td><td>그 폴더에서 git을 실행한 것처럼 (<a href="https://git-scm.com/docs/git#Documentation/git.txt--Cltpathgt">git</a>)</td></tr>
+<tr><td><code>git log --oneline -3</code></td><td>최근 커밋 3개를 한 줄씩 (<a href="https://git-scm.com/docs/git-log">git-log</a>)</td></tr>
+<tr><td><code>git show HEAD</code> / <code>--stat</code></td><td>마지막 커밋의 작성자·메시지·바뀐 줄 / 바뀐 파일 목록만 (<a href="https://git-scm.com/docs/git-show">git-show</a>)</td></tr>
+</table>
+
+<h2>7. 실습 — 예측하고 직접 친다</h2>
+<div class="note">실습 창(컨테이너로 연 shop)은 컨테이너를 켜 두는 용도다. 명령은 모두 호스트의 이 창 터미널 <code>lab</code>에서 친다. 명령마다 먼저 <code>Clear-Host</code>를 치고, 출력은 <code>@terminal:lab</code>으로 붙인다.</div>
+
+<h3>A. 컨테이너를 켜고, <code>docker exec</code>가 누구로 도는지 재기</h3>
+<ol class="steps">
+<li>
+<p>실습 창을 연다. 왼쪽 아래가 <b>Dev Container: shop</b>이 아니면 F1 → <b>Dev Containers: Reopen in Container</b>.</p>
+<pre><code>code -n E:\Study\Inflearn\projects\shop-docker-devcontainer</code></pre>
+<p>호스트 터미널 <code>lab</code>에서 컨테이너 이름을 확인하고 변수에 담는다. 8회차 끝의 이름은 <code>interesting_carson</code>이었다. Rebuild하지 않았으면 같다.</p>
+<pre><code>docker ps --format "{{.Names}}  {{.Status}}"
+$c = "interesting_carson"</code></pre>
+</li>
+<li>
+<p>옵션 없이 사용자·작업 폴더·환경 변수를 본다.</p>
+<pre><code>docker exec $c whoami
+docker exec $c pwd
+docker exec $c printenv HOME CLAUDE_CONFIG_DIR</code></pre>
+<div class="predict">재료: shop 컨테이너의 <code>Config.User</code>는 <code>"root"</code>, <code>Config.WorkingDir</code>는 비어 있다. docker exec 문서의 예시에서 작업 폴더를 정하지 않은 컨테이너의 <code>pwd</code>는 <code>/</code>이고, root로 돈 <code>env</code>에는 <code>HOME=/root</code>가 나온다. <code>containerEnv</code> 값은 <code>docker exec</code>에도 보인다. 세 명령은 각각 무엇을 출력할까?</div>
+</li>
+<li>
+<p>사용자와 폴더를 정해서 다시 본다.</p>
+<pre><code>docker exec -u vscode -w /workspaces/shop-docker-devcontainer $c whoami
+docker exec -u vscode -w /workspaces/shop-docker-devcontainer $c pwd
+docker exec -u vscode $c printenv HOME</code></pre>
+<p>확인 거리: <code>-u vscode</code>만 줘도 <code>HOME</code>이 바뀌는가. 문서에 없어서 예측하지 않고 결과를 본다.</p>
+<p>2단계와 3단계 결과를 놓고 Claude와 이야기한다. root로 <code>claude</code>를 띄웠다면 홈 폴더, <code>CLAUDE_CONFIG_DIR</code>, 컨테이너 Claude가 만든 파일의 소유자 중 무엇이 어긋났을까?</p>
+<p>이어서 컨테이너 Claude의 도움말에서 <code>permission</code>이 든 줄만 본다. 3절의 <code>--permission-prompts</code>가 이 버전에 있는지 확인한다. <code>claude</code>를 못 찾는다는 오류가 나면 출력을 붙여 넣고 멈춘다.</p>
+<pre><code>docker exec -u vscode $c claude --help | Select-String "permission"</code></pre>
+</li>
+</ol>
+
+<h3>B. 이슈 파일 읽기</h3>
+<ol class="steps" start="4">
+<li>
+<p>호스트 Claude가 <code>.scratch/dev-container-readme/issue.md</code>를 써 두었다. 요약:</p>
+<ul>
+<li>루트에 <code>README.md</code>를 새로 만들고 "Dev container로 열기" 절을 쓴다. 담을 것: 필요한 것, 여는 순서, 포트가 8081인 이유와 바꾸는 곳, Gradle 캐시와 Claude 로그인이 Rebuild 뒤에도 남는 이유, 빌드·실행 명령.</li>
+<li>근거는 <code>devcontainer.json</code>과 저장소 파일에서만 가져온다. 파일에서 확인할 수 없는 내용은 쓰지 않는다.</li>
+<li><code>README.md</code>만 커밋한다(메시지 <code>README에 dev container 사용법 추가</code>). <code>.scratch/</code>는 커밋하지 않는다. 끝나면 <code>report.md</code>를 쓴다. 빌드·실행·push는 하지 않는다.</li>
+</ul>
+<div class="predict">재료: 컨테이너 Claude는 마운트된 프로젝트 폴더만 본다. 루트 <code>CLAUDE.md</code>도 <code>lecture/</code>도 없다. 8081을 고른 진짜 이유는 "spring-backend 트랙이 호스트에서 8080을 쓴다"인데, 이 사실은 shop 저장소 안에 없다. 컨테이너 Claude는 포트 이유를 어떻게 쓸까?</div>
+</li>
+</ol>
+
+<h3>C. 첫 실행: 권한 옵션 없이</h3>
+<ol class="steps" start="5">
+<li>
+<p>위에서부터: 출력을 UTF-8로 읽게 맞춘다(4절). worktree 폴더에서 <code>vscode</code>로, 커넥터를 끈 채(<code>-e</code>, 5절) 컨테이너 Claude에게 이슈 파일을 맡기고 JSON을 객체로 받는다. 필드 다섯 개를 본다. 거부된 호출 목록을 본다.</p>
+<pre><code>[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$r = docker exec -u vscode -w /workspaces/shop-docker-devcontainer -e ENABLE_CLAUDEAI_MCP_SERVERS=false $c claude -p "Read .scratch/dev-container-readme/issue.md and do what it says." --output-format json | ConvertFrom-Json
+$r | Format-List result, session_id, is_error, num_turns, total_cost_usd
+$r.permission_denials</code></pre>
+<p>두 번째 줄은 몇 분 걸릴 수 있다. 끝날 때까지 출력이 없다.</p>
+<div class="predict">재료: 권한 옵션이 없고, <code>-p</code>는 Manual로 시작하며, 아무도 승인하지 않는다. <code>README.md</code>가 생길까? 커밋은? <code>permission_denials</code>에는 무엇이 들어 있을까?</div>
+<p>확인 거리: 거부가 있었을 때 <code>is_error</code>가 <code>True</code>가 되는가. 문서에 없어서 결과를 본다.</p>
+<p>호스트에서 worktree의 바뀐 파일을 짧게 본다(<code>-C</code>는 그 폴더에서 git을 실행한 것처럼, <code>--short</code>는 한 줄씩, <code>??</code>는 git이 모르는 새 파일).</p>
+<pre><code>git -C E:\Study\Inflearn\projects\shop-docker-devcontainer status --short</code></pre>
+</li>
+</ol>
+
+<h3>D. 이어서: 필요한 권한만 주고 <code>--resume</code></h3>
+<ol class="steps" start="6">
+<li>
+<p>같은 세션에 이어서 시킨다. 이번에는 파일 쓰기·고치기와 <code>git add</code>·<code>git commit</code>만 허용한다.</p>
+<pre><code>$r2 = docker exec -u vscode -w /workspaces/shop-docker-devcontainer -e ENABLE_CLAUDEAI_MCP_SERVERS=false $c claude -p "You now have permission. Finish the task." --resume $r.session_id --allowedTools "Write,Edit,Bash(git add *),Bash(git commit *)" --output-format json | ConvertFrom-Json
+$r2 | Format-List result, session_id, num_turns, total_cost_usd
+$r2.permission_denials</code></pre>
+<div class="predict">프롬프트에 이슈 파일 이름이 없다. 컨테이너 Claude는 무엇을 할지 알까? <code>$r2.session_id</code>는 <code>$r.session_id</code>와 같을까? <code>permission_denials</code>는 비어 있을까?</div>
+</li>
+</ol>
+
+<h3>E. 호스트에서 리뷰하고 후속 지시</h3>
+<ol class="steps" start="7">
+<li>
+<p>위에서부터: 최근 커밋 3개, 마지막 커밋의 작성자·메시지·바뀐 파일 목록, 남은 변경.</p>
+<pre><code>git -C E:\Study\Inflearn\projects\shop-docker-devcontainer log --oneline -3
+git -C E:\Study\Inflearn\projects\shop-docker-devcontainer show --stat HEAD
+git -C E:\Study\Inflearn\projects\shop-docker-devcontainer status --short</code></pre>
+<div class="predict">커밋 작성자는 누구로 찍힐까? (7회차: Dev Containers는 사용자 <code>.gitconfig</code>를 컨테이너로 복사한다) <code>status</code>에는 무엇이 남을까?</div>
+<p>이어서 <code>git show HEAD</code>로 본문을 Claude와 함께 읽는다. README의 문장마다 <code>devcontainer.json</code>의 어느 줄이 근거인지, 근거 없는 문장은 없는지 본다. <code>report.md</code>의 "확인하지 못한 것"도 읽는다.</p>
+</li>
+<li>
+<p><b>시간이 남으면.</b> 리뷰에서 고칠 점을 정하면 같은 세션에 보낸다. 지시 문장은 리뷰 뒤에 Claude와 함께 정한다. 이어 갈 ID는 가장 최근 실행의 <code>$r2.session_id</code>다.</p>
+<pre><code>$r3 = docker exec -u vscode -w /workspaces/shop-docker-devcontainer -e ENABLE_CLAUDEAI_MCP_SERVERS=false $c claude -p "리뷰 지시" --resume $r2.session_id --allowedTools "Write,Edit,Bash(git add *),Bash(git commit *)" --output-format json | ConvertFrom-Json
+$r3.result</code></pre>
+<p>끝나면 7단계의 <code>log</code>와 <code>show --stat</code>를 다시 본다.</p>
+</li>
+</ol>
+
+<div class="note"><b>실습에서 드러난 것 (2026-10-21).</b> 옵션 없는 <code>docker exec</code>는 <code>root</code>, 작업 폴더 <code>/</code>, <code>HOME=/root</code>였다. <code>-u vscode</code>만 줘도 <code>HOME=/home/vscode</code>가 된다. 2.1.304 도움말에 <code>--permission-prompts</code>(host·none, 기본 host)가 있고, <code>--permission-mode</code> 목록에는 <code>default</code> 대신 <code>manual</code>이 있다. 권한 옵션 없는 첫 실행은 거부 5건(Bash 3, Write 2)으로 아무것도 바꾸지 못했는데 <code>is_error</code>는 <code>False</code>였다. 판정은 <code>permission_denials</code>와 <code>git</code>으로 한다. <code>--resume</code>은 같은 <code>session_id</code>를 이어 썼다. 리뷰 반영은 amend가 아니라 새 커밋(<code>710a74a</code>)이었다. 허용 목록은 할 수 있는 범위만 정한다.</div>
+
+<h2>8. 남겨 둘 것과 다음</h2>
+<ul>
+<li>남긴다: worktree와 브랜치, 컨테이너, 볼륨 <code>claude-code-config-…</code>·<code>shop-gradle-home</code>·<code>vscode</code>.</li>
+<li><code>.scratch/</code>를 지울지, shop <code>.gitignore</code>에 넣을지는 끝에 정한다.</li>
+<li>조사 문서의 미확인 6(<code>devcontainer exec</code> CLI)과 7(볼륨 위에 파일 하나 bind mount)은 오늘 하지 않는다. 호스트에 CLI 설치와 Rebuild가 필요해서 마무리 회차로 넘긴다.</li>
+<li>마무리 회차: 면접 질문 총정리, 오늘 만든 README 다듬기.</li>
+</ul>
+
+<h2>더 읽을 것</h2>
+<p>1차 자료: <a href="https://code.claude.com/docs/en/headless">Run Claude Code programmatically</a>. "Get structured output", "Continue conversations", "Auto-approve tools" 세 절을 읽는다.</p>
+
+<div class="note">막히거나 출력이 예측과 다르면 출력을 붙여 넣고 물어보세요. Claude가 이 과정의 선생님입니다.</div>
+
+<nav class="lesson-nav">
+<a href="0009-claude-in-dev-container.html">← 8회차 · 컨테이너 안 Claude</a>
+<a href="../reference/glossary.html">용어집 →</a>
+</nav>
+
+</main>
+</body>
+</html>

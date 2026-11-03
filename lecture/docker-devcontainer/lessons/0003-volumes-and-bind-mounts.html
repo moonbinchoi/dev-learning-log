@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2회차 · 데이터</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+
+<h1>2회차 · 데이터</h1>
+<p class="subtitle">오늘의 성과: postgres 컨테이너를 지웠다가 다시 만들어도 테이블이 남아 있게 한다. 데이터가 어디에 사는지 말할 수 있다.</p>
+
+<p>1회차에서 <code>start</code> 뒤에는 <code>mark.txt</code>가 남아 있었다. 같은 컨테이너의 <b>쓰기 가능한 컨테이너 레이어</b>에 있었기 때문이다. 그런데 DB는 이미지를 바꾸면 컨테이너를 새로 만든다. 5회차 Compose와 7회차 shop dev container도 컨테이너를 수시로 지우고 다시 만든다. 그때도 데이터가 남으려면 레이어 밖에 저장해야 한다. 용어는 <a href="../reference/glossary.html">용어집</a>을 따른다.</p>
+
+<h2>1. 데이터는 세 곳에 산다</h2>
+<figure>
+<svg viewBox="0 0 720 270" role="img" aria-label="Windows 호스트의 폴더는 bind mount로 VM 경계를 넘어 컨테이너에 연결된다. named volume은 WSL 2 VM 안에서 Docker가 관리한다. 쓰기 레이어는 컨테이너 안에 있고 rm과 함께 사라진다">
+  <rect class="box" x="10" y="20" width="200" height="230" rx="4"/>
+  <text x="26" y="48" font-weight="700">Windows 호스트</text>
+  <rect class="box" x="26" y="150" width="168" height="50" rx="4"/>
+  <text x="40" y="181" font-size="14">E:\…\docker-lab\site</text>
+
+  <rect class="box" x="250" y="20" width="460" height="230" rx="4" stroke-dasharray="6 4"/>
+  <text x="266" y="48" font-weight="700">WSL 2 VM (데몬)</text>
+  <rect class="box-accent" x="400" y="62" width="280" height="90" rx="4"/>
+  <text x="416" y="90" font-weight="700">컨테이너</text>
+  <text x="416" y="120" font-size="14">쓰기 레이어 — rm과 함께 삭제</text>
+  <rect class="box" x="400" y="186" width="280" height="50" rx="4"/>
+  <text x="416" y="217" font-size="14">named volume pgdata — 남는다</text>
+
+  <path class="arrow" d="M194 175 H330 V120 H400" marker-end="url(#a)"/>
+  <text x="260" y="198" font-size="13">bind mount</text>
+  <text x="260" y="220" font-size="13">VM 경계를 넘는다</text>
+  <path class="arrow" d="M540 186 V152" marker-end="url(#a)"/>
+  <text x="550" y="174" font-size="13">-v pgdata:/경로</text>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="currentColor"/></marker></defs>
+</svg>
+<figcaption>마운트 종류에는 이 밖에 tmpfs(호스트 메모리)가 있다. 오늘은 다루지 않는다. (<a href="https://docs.docker.com/engine/storage/">Storage overview</a>)</figcaption>
+</figure>
+
+<ul>
+<li><b>쓰기 레이어</b>는 컨테이너마다 따로 있다. 컨테이너를 지우면 함께 사라지고, 다른 컨테이너에서 꺼내 쓰기 어렵다. (<a href="https://docs.docker.com/engine/storage/">Storage overview</a>)</li>
+<li><b>볼륨(volume)</b>은 Docker 데몬이 만들고 관리하는 저장소다. 컨테이너를 지워도 남는다. 호스트에서 볼륨 데이터에 직접 접근하는 것은 지원하지 않는다. (<a href="https://docs.docker.com/engine/storage/volumes/">Volumes</a>)</li>
+<li><b>bind mount</b>는 호스트의 경로를 컨테이너에 그대로 연결한다. 호스트와 컨테이너가 둘 다 파일을 고칠 수 있고, Docker가 둘을 격리하지 않는다. (<a href="https://docs.docker.com/engine/storage/bind-mounts/">Bind mounts</a>)</li>
+</ul>
+
+<h2>2. named volume과 bind mount</h2>
+<table>
+<tr><th></th><th>named volume</th><th>bind mount</th></tr>
+<tr><td>쓰는 법</td><td><code>-v pgdata:/경로</code></td><td><code>-v E:\…\site:/경로</code></td></tr>
+<tr><td>누가 관리</td><td>Docker 데몬. <code>docker volume</code> 명령으로 다룬다</td><td>사용자. 그냥 호스트 폴더다</td></tr>
+<tr><td>빈 것을 붙이면</td><td>컨테이너 경로에 원래 있던 파일이 볼륨으로 <b>복사</b>된다</td><td>원래 있던 파일이 <b>가려진다</b></td></tr>
+<tr><td>호스트 경로가 없으면</td><td>—</td><td><code>-v</code>는 디렉터리를 새로 만든다. <code>--mount</code>는 오류를 낸다</td></tr>
+<tr><td>Windows에서 속도</td><td>VM 안의 리눅스 파일 시스템이라 빠르다</td><td>Windows 드라이브면 VM 경계를 넘어 느리다</td></tr>
+<tr><td>쓰는 곳</td><td>DB 데이터처럼 Docker만 읽고 쓰면 되는 것</td><td>소스 코드처럼 호스트에서 편집하는 것</td></tr>
+</table>
+<p class="muted">근거: <a href="https://docs.docker.com/engine/storage/volumes/">Volumes</a>(복사, <code>volume-nocopy</code>), <a href="https://docs.docker.com/engine/storage/bind-mounts/">Bind mounts</a>(가려짐, 경로 자동 생성), <a href="https://docs.docker.com/desktop/features/wsl/best-practices/">WSL best practices</a>(속도).</p>
+
+<div class="note"><b>이름 없는 볼륨도 있다.</b> 볼륨 이름을 생략하면 Docker가 무작위 이름을 붙인다(anonymous volume). 이미지의 Dockerfile에 <code>VOLUME</code>이 선언돼 있으면 <code>-v</code>를 안 줘도 그 경로에 anonymous volume이 붙는다. <code>docker rm -v</code>는 anonymous volume만 지우고 named volume은 남긴다. (<a href="https://docs.docker.com/reference/cli/docker/container/rm/">docker rm -v</a>)</div>
+
+<h3>postgres 이미지에서 알아 둘 것</h3>
+<ul>
+<li><code>POSTGRES_PASSWORD</code>만 필수다. <code>POSTGRES_DB</code>를 안 주면 사용자 이름(<code>postgres</code>)이 DB 이름이 된다.</li>
+<li>18 이상은 <code>VOLUME</code>이 <code>/var/lib/postgresql</code>이고, 실제 데이터는 그 아래 <code>18/docker</code>에 있다. 17 이하는 <code>/var/lib/postgresql/data</code>다. 그래서 오늘은 <code>postgres:18</code>로 버전을 고정한다.</li>
+<li><code>POSTGRES_*</code> 변수는 데이터 디렉터리가 <b>비어 있을 때만</b> 효과가 있다. 이미 DB가 있으면 건드리지 않는다.</li>
+</ul>
+<p class="muted">근거: <a href="https://hub.docker.com/_/postgres">postgres 공식 이미지</a>의 Environment Variables, PGDATA 절.</p>
+
+<h2>3. 오늘 쓰는 명령</h2>
+<table>
+<tr><th>명령</th><th>하는 일</th></tr>
+<tr><td><code>run --rm</code></td><td>컨테이너가 끝나면 바로 지운다. (<a href="https://docs.docker.com/reference/cli/docker/container/run/#rm">run --rm</a>)</td></tr>
+<tr><td><code>run -e 이름=값</code></td><td>컨테이너에 환경 변수를 넘긴다. (<a href="https://docs.docker.com/reference/cli/docker/container/run/#env">run -e</a>)</td></tr>
+<tr><td><code>run -v 이름:/경로</code></td><td>named volume을 컨테이너 경로에 붙인다. 볼륨이 없으면 만든다. (<a href="https://docs.docker.com/engine/storage/volumes/">Volumes</a>)</td></tr>
+<tr><td><code>run -v 호스트경로:/경로</code></td><td>호스트 폴더를 컨테이너 경로에 bind mount한다. (<a href="https://docs.docker.com/engine/storage/bind-mounts/">Bind mounts</a>)</td></tr>
+<tr><td><code>volume ls</code></td><td>볼륨 목록을 보여 준다.</td></tr>
+<tr><td><code>volume inspect 이름</code></td><td>볼륨의 상세(<code>Mountpoint</code> 등)를 보여 준다.</td></tr>
+<tr><td><code>volume rm 이름</code></td><td>볼륨을 지운다. (<a href="https://docs.docker.com/reference/cli/docker/volume/">docker volume</a>)</td></tr>
+<tr><td><code>exec pg psql … -c</code></td><td><code>-U postgres -d docker_lab -c "SQL"</code>: 컨테이너 안의 <code>psql</code>로 <code>docker_lab</code> DB에 <code>postgres</code> 사용자로 접속해 SQL 한 줄을 실행한다. (<a href="https://www.postgresql.org/docs/current/app-psql.html">psql</a>)</td></tr>
+<tr><td><code>exec web sh -c "명령"</code></td><td>컨테이너 안에서 셸 명령 한 줄을 실행한다. <code>&gt;</code> 같은 리다이렉트를 컨테이너 안에서 처리하려고 <code>sh -c</code>로 감싼다.</td></tr>
+<tr><td><code>Set-Content 파일 "내용"</code></td><td>PowerShell. 호스트에 파일을 만들거나 덮어쓴다.</td></tr>
+<tr><td><code>Get-ChildItem 폴더</code></td><td>PowerShell. 호스트 폴더의 목록을 보여 준다.</td></tr>
+</table>
+
+<h2>4. 실습 — 예측하고 직접 친다</h2>
+<p>PowerShell에서 <code>projects\docker-lab</code>으로 이동해서 친다. 명령마다 예측을 먼저 말하고, <code>Clear-Host</code> 후 실행한 뒤 <code>@terminal</code>로 보여 준다.</p>
+<pre><code>cd E:\Study\Inflearn\projects\docker-lab</code></pre>
+
+<h3>A. 쓰기 레이어는 컨테이너 것이다</h3>
+<ol class="steps">
+<li>
+<p>1회차의 <code>web</code>은 지웠다. 같은 nginx 이미지로 새 컨테이너를 띄워 <code>/tmp</code>를 본다. <code>--rm</code>은 끝나면 컨테이너를 바로 지운다.</p>
+<pre><code>docker run --rm nginx ls /tmp</code></pre>
+<div class="predict"><code>mark.txt</code>가 보일까? 근거를 용어집 용어로 말한다.</div>
+</li>
+</ol>
+
+<h3>B. 이름 없는 볼륨</h3>
+<ol class="steps" start="2">
+<li>
+<p><code>-v</code> 없이 postgres를 띄운다. <code>-e</code>는 환경 변수를 넘긴다. postgres는 <code>POSTGRES_PASSWORD</code>가 없으면 뜨지 않는다.</p>
+<pre><code>docker run -d --name pg0 -e POSTGRES_PASSWORD=pw postgres:18
+docker volume ls</code></pre>
+<div class="predict"><code>-v</code>를 안 줬다. <code>docker volume ls</code>에 무엇이 나올까?</div>
+</li>
+<li>
+<pre><code>docker rm -f pg0
+docker volume ls</code></pre>
+<div class="predict">컨테이너를 지웠다. 그 볼륨은 남을까? 남는다면 나중에 누가 이 볼륨을 다시 찾아 쓸 수 있을까?</div>
+<p>확인한 뒤 남은 볼륨을 지운다. <code>volume rm</code>은 볼륨을 지운다. 이름은 <code>volume ls</code>에 나온 긴 문자열이다.</p>
+<pre><code>docker volume rm &lt;VOLUME NAME&gt;</code></pre>
+</li>
+</ol>
+
+<h3>C. named volume — 오늘의 핵심</h3>
+<ol class="steps" start="4">
+<li>
+<p><code>-v pgdata:/var/lib/postgresql</code>은 <code>pgdata</code>라는 볼륨을 postgres의 데이터 경로에 붙인다.</p>
+<pre><code>docker run -d --name pg -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=docker_lab -v pgdata:/var/lib/postgresql postgres:18
+docker volume ls</code></pre>
+<div class="predict"><code>pgdata</code>를 미리 <code>docker volume create</code>로 만들지 않았다. 오류가 날까?</div>
+</li>
+<li>
+<p>몇 초 기다린 뒤 테이블을 만든다. <code>psql -U postgres -d docker_lab -c "SQL"</code>은 <code>postgres</code> 사용자로 <code>docker_lab</code> DB에 접속해 SQL 한 줄을 실행한다. <code>the database system is starting up</code>이 나오면 다시 친다.</p>
+<pre><code>docker exec pg psql -U postgres -d docker_lab -c "CREATE TABLE memo(t text); INSERT INTO memo VALUES ('hello');"</code></pre>
+</li>
+<li>
+<p>컨테이너를 지우고, 같은 명령으로 새로 만든다.</p>
+<pre><code>docker rm -f pg
+docker volume ls
+docker run -d --name pg -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=docker_lab -v pgdata:/var/lib/postgresql postgres:18
+docker exec pg psql -U postgres -d docker_lab -c "SELECT * FROM memo;"</code></pre>
+<div class="predict">세 가지를 답한다. (1) <code>rm -f</code> 뒤 <code>pgdata</code>는 남을까? (2) 새 컨테이너의 ID는 지운 것과 같을까? (3) <code>hello</code>가 나올까? 두 번째 run에도 <code>POSTGRES_DB</code>를 줬는데, DB를 새로 만들어 덮어쓸까?</div>
+</li>
+<li>
+<p><code>volume inspect</code>는 볼륨의 상세 정보를 JSON으로 보여 준다.</p>
+<pre><code>docker volume inspect pgdata</code></pre>
+<div class="predict"><code>Mountpoint</code>에 나온 경로를 Windows 탐색기에서 찾을 수 있을까? 그림의 어느 상자에 있는 경로일까?</div>
+</li>
+</ol>
+
+<h3>D. bind mount</h3>
+<ol class="steps" start="8">
+<li>
+<p><code>site</code> 폴더는 아직 없다. 그대로 nginx의 HTML 디렉터리에 bind mount한다. <code>${PWD}</code>는 PowerShell의 현재 폴더 경로다. <code>Get-ChildItem</code>은 폴더 목록을 보여 준다.</p>
+<pre><code>docker run -d --name web -p 8081:80 -v "${PWD}\site:/usr/share/nginx/html" nginx
+Get-ChildItem</code></pre>
+<div class="predict">호스트에 없는 경로를 줬다. 오류가 날까, <code>site</code> 폴더가 생길까? (문서는 생긴다고 한다. Windows에서도 그런지 직접 재 본다.) 이어서 통합 브라우저로 <code>http://localhost:8081</code>을 열면 1회차의 "Welcome to nginx!"가 보일까?</div>
+</li>
+<li>
+<p>호스트에서 파일을 만들고 브라우저를 새로 고친다. <code>Set-Content</code>는 파일을 만들거나 덮어쓴다.</p>
+<pre><code>Set-Content site\index.html "&lt;h1&gt;from host&lt;/h1&gt;"</code></pre>
+<div class="predict">컨테이너를 다시 만들지 않았다. 새로 고치면 바뀔까?</div>
+</li>
+<li>
+<p>반대 방향. 컨테이너 안에서 파일을 만든다. <code>sh -c "…"</code>는 <code>&gt;</code> 리다이렉트를 호스트가 아닌 컨테이너 안의 셸이 처리하게 한다.</p>
+<pre><code>docker exec web sh -c "echo from-container &gt; /usr/share/nginx/html/c.txt"
+Get-ChildItem site</code></pre>
+<div class="predict">호스트의 <code>site</code>에 <code>c.txt</code>가 보일까?</div>
+</li>
+<li>
+<pre><code>docker rm -f web
+Get-ChildItem site</code></pre>
+<div class="predict">컨테이너를 지웠다. <code>site</code>의 파일들은 어떻게 될까?</div>
+</li>
+</ol>
+
+<h2>5. 왜 docker-lab에서 bind mount가 느린가</h2>
+<p><code>projects\docker-lab</code>은 Windows의 E: 드라이브에 있다. 그림처럼 데몬은 WSL 2 VM 안에 있으므로, 여기를 bind mount하면 파일을 읽고 쓸 때마다 VM 경계를 넘는다. Docker 문서는 Windows 드라이브에서 bind mount하면 I/O가 리눅스 파일 시스템보다 훨씬 느리고, 컨테이너가 파일 변경 이벤트(inotify)를 받지 못해 자동 리로드 도구가 제대로 돌지 않을 수 있다고 한다. 권장은 프로젝트를 WSL의 리눅스 파일 시스템에 두는 것이다. (<a href="https://docs.docker.com/desktop/features/wsl/best-practices/">Docker Desktop WSL 2 best practices</a>)</p>
+<p>6회차에 docker-lab을 dev container로 열 때, 같은 이유로 Gradle 캐시는 named volume에 둔다.</p>
+
+<h2>더 읽을 것</h2>
+<p>1차 자료: <a href="https://docs.docker.com/engine/storage/volumes/">Docker docs — Volumes</a>. named·anonymous 볼륨, 컨테이너 삭제 뒤에도 남는 것, 빈 볼륨 복사, <code>-v</code>와 <code>--mount</code>의 차이를 다룬다. <code>--mount</code>는 <code>key=value</code> 형식이고 문서가 권장하는 형식이다. 이 과정은 Compose와 모양이 비슷한 <code>-v</code>를 쓴다.</p>
+
+<div class="note">막히거나 출력이 예측과 다르면 <code>@terminal</code>로 보여 주고 물어보세요. Claude가 이 과정의 선생님입니다.</div>
+
+<nav class="lesson-nav">
+<a href="0002-container-lifecycle.html">← 1회차 · 컨테이너 다루기</a>
+<a href="0004-networking.html">3회차 · 네트워크 →</a>
+</nav>
+
+</main>
+</body>
+</html>

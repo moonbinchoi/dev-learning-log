@@ -1,0 +1,10 @@
+/projects/
+/.scratch/
+*.pdf
+build/
+bin/
+.gradle/
+__pycache__/
+.DS_Store
+/.claude/settings.local.json
+/.claude/worktrees/
