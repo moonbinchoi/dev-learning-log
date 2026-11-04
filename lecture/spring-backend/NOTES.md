@@ -80,12 +80,12 @@
 ## 공유 파일 변경 요청
 
 ## 현재 위치
-- **1회차 완료(2026-11-02), 다음은 2회차(리마인드, MVC2 6장).** 커밋 전이면 먼저 `shop`을 커밋한다.
-  - 1회차 피드백 처리(2026-11-02): 회차 순서에 동작 모델·따라가기·직접 추적을 넣었고, `docs/learning/lesson-review.md`에 항목 9~11을 더했다. 2회차 첫 적용이다.
-  - `im-not-ai`: 글쓰기 규칙은 `.claude/rules/korean-humanize.md`(`lecture/**`에서 로드), 검사는 `python .tools/im-not-ai/check-korean.py <파일>`이다. 패턴 수는 판단 재료이고 합격 기준이 아니다. 도입 범위와 갱신·제거 절차는 `.tools/im-not-ai/README.md`에 있다.
-  - 도식 도구는 D2로 정했다(2026-11-02). Figma는 도입하지 않았다. 손으로 고칠 캔버스가 필요해지면 `@next-ai-drawio/mcp-server`를 먼저 본다. 근거: `docs/research/lesson-diagrams/`.
-  - 2회차 시작 전: 10일 넘게 비면 앞 회차 요약을 먼저 준다. 앱을 다시 띄우면 메모리 저장소는 비어 있다.
-  - 2회차 회상 퀴즈(말로 받는다): 검증 실패 때 왜 리다이렉트하지 않는가, `Item`에 `@NotBlank`를 달면 검증되는가, 타입 오류에서 `BindingResult` 유무에 따른 결과와 상태 코드(400과 500의 구분), `addAttribute`의 값이 URL에서 어디로 가는가.
-  - 남은 일: `BindingResult`를 폼 파라미터 앞에 두면 어떻게 되는지(진단 Q3-c) 실행 확인을 못 했다. `ItemRepository`의 순번은 0부터 시작한다(선택 수정). `reference/form-validation.html`은 채점 뒤 공개했다.
+- **2회차 완료(2026-11-04), 다음은 3회차(MVC2 7장 로그인 체크: 필터 vs 인터셉터, `@Login` ArgumentResolver).** 시작 전에 `shop`의 `lesson-02` 브랜치를 커밋하고 `master`에 `--no-ff`로 병합했는지 확인한다.
+  - 3회차 회상 퀴즈(말로 받는다): 1회차 것(검증 실패 때 왜 리다이렉트하지 않는가, `Item`에 `@NotBlank`를 달면 검증되는가, 타입 오류에서 `BindingResult` 유무에 따른 결과와 상태 코드, `addAttribute`의 값이 URL에서 어디로 가는가)과 2회차 것(`invalidate()`가 지우는 것은 서버 세션인가 브라우저 쿠키인가, 쿠키 이름 `JSESSIONID`와 세션 속성 이름 `loginMember`의 차이, 임의 쿠키로 `GET /`을 보내면 상태 코드와 화면). 2회차에서는 1회차 4문항을 건너뛰었다.
+  - 3회차 코딩 전: 필터에서 `getSession(false)`를 쓰는 이유를 먼저 말하게 한다. 2회차 진단에서 몰랐고, 설명한 뒤 코드로는 확인하지 않았다. 면접 Q1(쿠키와 세션의 차이)은 "세션이 쿠키를 감싼다"고 뒤집어 답했으므로 다시 묻는다.
+  - 2회차 남은 일: 타임아웃 실험(`server.servlet.session.timeout=1m`)은 실행하지 않고 정답만 받았다. 앱을 다시 띄우면 메모리 저장소는 비고 `TestDataInit`이 채운다.
+  - 1회차에서 남은 일: `BindingResult`를 폼 파라미터 앞에 두면 어떻게 되는지(진단 Q3-c) 실행 확인을 못 했다. `ItemRepository`의 순번은 0부터 시작한다(선택 수정, `MemberRepository`도 같다).
+  - 열린 질문(확인 안 됨, 과제가 아니라 실험 주제): `record` 폼 객체가 `th:field`·`BindingResult`와 함께 동작하는가, `void`가 아닌 setter(체이닝)를 스프링과 타임리프가 프로퍼티로 인식하는가.
   - 미확인: 수정 저장 뒤 URL이 `/items/0/edit`로 보였던 1건은 재현되지 않았고 원인을 모른다. 오류 문구가 영어인 이유(컨테이너 로케일로 추정)도 확인하지 않았다.
+  - `im-not-ai`: 글쓰기 규칙은 `.claude/rules/korean-humanize.md`(`lecture/**`에서 로드), 검사는 `python .tools/im-not-ai/check-korean.py <파일>`이다. 패턴 수는 판단 재료이고 합격 기준이 아니다. 도입 범위와 갱신·제거 절차는 `.tools/im-not-ai/README.md`에 있다.
 - 6회차 전에 정할 것: DB를 어느 컨테이너에서 띄울지. 교재는 H2 서버 모드다. 후보는 dev container를 Compose 방식으로 바꿔 db 서비스를 더하는 것(docker-devcontainer 트랙에서 배운 방식).
