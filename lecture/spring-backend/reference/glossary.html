@@ -28,11 +28,18 @@
 <tr id="type-mismatch"><td><code>typeMismatch</code></td><td>바인딩에서 타입 변환이 실패했을 때 스프링이 만드는 <code>FieldError</code>의 오류 코드. 예: 숫자 칸에 <code>abc</code>. (1회차)</td></tr>
 <tr id="bean-validation"><td>Bean Validation</td><td>필드에 <code>@NotBlank</code>·<code>@Max</code> 같은 애너테이션을 달아 검증 규칙을 선언하는 표준(Jakarta Validation). 구현체는 Hibernate Validator. (1회차)</td></tr>
 <tr id="form-object"><td>폼 객체</td><td>폼 데이터를 받기 위해서만 만든 객체(<code>ItemSaveForm</code>, <code>ItemUpdateForm</code>). 도메인 객체(<code>Item</code>)와 분리한다. (1회차)</td></tr>
+<tr id="global-error"><td>글로벌 오류</td><td>특정 필드가 아닌 객체 전체의 오류(<code>ObjectError</code>). <code>bindingResult.reject(코드, 기본 문구)</code>로 넣고, 템플릿은 <code>${#fields.globalErrors()}</code>로 그린다. 예: 로그인 실패. (2회차)</td></tr>
+<tr id="cookie"><td>쿠키</td><td>서버가 응답의 <code>Set-Cookie</code> 헤더로 보내면 브라우저가 보관했다가, 같은 서버로 가는 요청마다 <code>Cookie</code> 헤더에 실어 보내는 <code>이름=값</code>. 브라우저 쪽에 있으므로 사용자가 바꿀 수 있다. (2회차)</td></tr>
+<tr id="session"><td>세션</td><td>중요한 데이터는 서버에 두고, 브라우저와는 추측할 수 없는 세션 ID로만 연결하는 방법. 서블릿의 <code>HttpSession</code>이 구현한다. (2회차)</td></tr>
+<tr id="session-id"><td>세션 ID (<code>JSESSIONID</code>)</td><td>세션 하나를 가리키는 무작위 값. 서블릿 세션은 <code>JSESSIONID</code>라는 쿠키로 주고받는다. (2회차)</td></tr>
+<tr id="session-store"><td>세션 저장소</td><td>세션 ID → 세션 객체를 보관하는 서버 메모리. 스프링 부트 기본 구성에서는 내장 톰캣이 관리한다. (2회차)</td></tr>
+<tr id="session-timeout"><td>세션 타임아웃</td><td>마지막 요청 뒤 이 시간 동안 요청이 없으면 서버가 세션을 지운다. 기본 30분, <code>server.servlet.session.timeout</code>으로 바꾼다. (2회차)</td></tr>
 </tbody>
 </table>
 
 <nav class="lesson-nav">
 <a href="../lessons/0001-item-form-validation.html">1회차 레슨</a>
+<a href="../lessons/0002-member-session-login.html">2회차 레슨</a>
 <a href="form-validation.html">폼·검증 요약</a>
 </nav>
 </main>

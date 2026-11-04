@@ -68,6 +68,8 @@ ol.steps > li { margin-bottom: 1.5rem; }
 figure { margin: 1.5rem 0; }
 figure svg { width: 100%; height: auto; color: var(--muted); }
 figcaption { color: var(--muted); font-size: .9em; }
+/* 교재 그림은 흰 배경이라 다크 모드에서도 흰 바탕에 둔다 */
+figure img { display: block; width: 100%; height: auto; background: #fff; border-radius: 4px; }
 svg text { fill: var(--fg); font-family: inherit; }
 svg .box { fill: none; stroke: var(--fg); }
 svg .box-accent { fill: none; stroke: var(--accent); stroke-width: 2; }

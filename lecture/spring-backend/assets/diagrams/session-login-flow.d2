@@ -1,0 +1,24 @@
+...@lesson-theme
+direction: down
+
+s1: "① POST /login\nloginId=test, password=test!" {class: [input; S1]}
+s2: "② LoginForm 바인딩·검증\n오류는 BindingResult에" {class: [step; S2]}
+s3: "③ LoginService.login\n회원 조회 + 비밀번호 비교" {class: [step; S3]}
+s4: "④ getSession() + setAttribute\n새 세션에 loginMember 보관" {class: [step; S4]}
+s5: "⑤ 리다이렉트 응답 Location: /\nSet-Cookie: JSESSIONID=ABC…" {class: [done; S5]}
+s6: "⑥ GET /\nCookie: JSESSIONID=ABC…" {class: [input; S6]}
+s7: "⑦ @SessionAttribute 조회\n있으면 loginHome, 없으면 home" {class: [done; S7]}
+
+fail: "로그인 폼 다시 표시" {class: fail}
+store: "세션 저장소(톰캣 메모리)\nABC… → 회원 test" {class: data}
+
+s1 -> s2: {class: flow}
+s2 -> s3: {class: flow}
+s3 -> s4: {class: flow}
+s4 -> s5: {class: flow}
+s5 -> s6: {class: flow}
+s6 -> s7: {class: flow}
+s2 -> fail: "hasErrors()" {class: off}
+s3 -> fail: "null → reject()" {class: off}
+s4 -> store: {class: save}
+s7 -> store: {class: flow}
