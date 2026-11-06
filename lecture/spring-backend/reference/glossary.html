@@ -34,12 +34,24 @@
 <tr id="session-id"><td>세션 ID (<code>JSESSIONID</code>)</td><td>세션 하나를 가리키는 무작위 값. 서블릿 세션은 <code>JSESSIONID</code>라는 쿠키로 주고받는다. (2회차)</td></tr>
 <tr id="session-store"><td>세션 저장소</td><td>세션 ID → 세션 객체를 보관하는 서버 메모리. 스프링 부트 기본 구성에서는 내장 톰캣이 관리한다. (2회차)</td></tr>
 <tr id="session-timeout"><td>세션 타임아웃</td><td>마지막 요청 뒤 이 시간 동안 요청이 없으면 서버가 세션을 지운다. 기본 30분, <code>server.servlet.session.timeout</code>으로 바꾼다. (2회차)</td></tr>
+<tr id="was"><td>WAS (서블릿 컨테이너)</td><td>웹 애플리케이션 서버. HTTP 요청을 받아 서블릿을 실행하고 필터·세션을 관리한다. 스프링 부트는 톰캣을 내장해 쓴다. (3회차)</td></tr>
+<tr id="singleton"><td>싱글톤</td><td>객체를 하나만 만들어 모든 요청이 함께 쓰는 방식. 필터·인터셉터·스프링 빈이 그렇다. 그래서 요청마다 다른 값을 필드에 두면 다른 요청과 섞인다. (3회차)</td></tr>
+<tr id="cross-cutting-concern"><td>공통 관심사</td><td>여러 기능이 공통으로 필요로 하는 일. 예: 상품 등록·수정·조회가 모두 로그인 검사를 필요로 한다. 웹 요청에 걸린 것은 필터나 인터셉터로 한곳에 둔다. (3회차)</td></tr>
+<tr id="dispatcher-servlet"><td><code>DispatcherServlet</code></td><td>스프링 MVC의 입구가 되는 서블릿. 요청 주소에 맞는 핸들러를 찾고, 인터셉터와 핸들러 어댑터를 차례로 불러 컨트롤러를 실행한다. (3회차)</td></tr>
+<tr id="handler"><td>핸들러</td><td>요청을 처리할 대상. <code>@Controller</code>의 <code>@GetMapping</code> 메서드 하나가 핸들러다. 정적 파일 요청은 다른 핸들러가 맡는다. (3회차)</td></tr>
+<tr id="handler-adapter"><td>핸들러 어댑터</td><td><code>DispatcherServlet</code> 대신 핸들러를 실제로 호출하는 객체. 호출 전에 <code>ArgumentResolver</code>로 파라미터 값을 만든다. (3회차)</td></tr>
+<tr id="servlet-filter"><td>서블릿 필터</td><td>서블릿 표준의 <code>Filter</code>. <code>DispatcherServlet</code>보다 앞에서 요청을 받는다. <code>chain.doFilter()</code>를 부르지 않으면 요청이 거기서 끝난다. (3회차)</td></tr>
+<tr id="filter-chain"><td>필터 체인</td><td>등록된 필터들이 순서대로 이어진 줄. 각 필터가 <code>chain.doFilter()</code>로 다음 필터를, 마지막 필터는 서블릿을 부른다. (3회차)</td></tr>
+<tr id="interceptor"><td>스프링 인터셉터</td><td>스프링 MVC의 <code>HandlerInterceptor</code>. <code>DispatcherServlet</code>과 컨트롤러 사이에서 <code>preHandle</code>·<code>postHandle</code>·<code>afterCompletion</code>으로 불린다. <code>preHandle</code>이 <code>false</code>면 컨트롤러가 호출되지 않는다. (3회차)</td></tr>
+<tr id="whitelist"><td>화이트리스트</td><td>검사 없이 항상 허용하는 경로 목록. 로그인 체크에서는 홈, 회원 가입, 로그인, CSS 같은 경로다. (3회차)</td></tr>
+<tr id="argument-resolver"><td><code>ArgumentResolver</code></td><td><code>HandlerMethodArgumentResolver</code>. 컨트롤러 파라미터 값을 만들어 넣는 객체. <code>supportsParameter</code>로 맡을 파라미터를 고르고 <code>resolveArgument</code>로 값을 만든다. (3회차)</td></tr>
 </tbody>
 </table>
 
 <nav class="lesson-nav">
 <a href="../lessons/0001-item-form-validation.html">1회차 레슨</a>
 <a href="../lessons/0002-member-session-login.html">2회차 레슨</a>
+<a href="../lessons/0003-login-check-filter-interceptor.html">3회차 레슨</a>
 <a href="form-validation.html">폼·검증 요약</a>
 </nav>
 </main>

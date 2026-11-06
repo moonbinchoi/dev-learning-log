@@ -1,0 +1,29 @@
+...@lesson-theme
+direction: down
+
+req: "HTTP 요청\nGET /items" {class: input}
+
+servlet: "서블릿 영역(톰캣)" {
+  class: group
+  label.near: top-left
+  filter: "필터 체인\nLoginCheckFilter" {class: step}
+  stop: "응답 후 종료\n서블릿 호출 없음" {class: stop}
+  filter -> stop: "return" {class: off}
+}
+
+mvc: "스프링 MVC 영역" {
+  class: group
+  label.near: top-left
+  ds: "DispatcherServlet\n핸들러를 찾는다" {class: step}
+  icpt: "인터셉터 체인\npreHandle" {class: step}
+  stop: "응답 후 종료\n컨트롤러 호출 없음" {class: stop}
+  adapter: "핸들러 어댑터\nArgumentResolver" {class: step}
+  ctrl: "컨트롤러\nItemController" {class: done}
+  ds -> icpt: {class: flow}
+  icpt -> adapter: "true" {class: flow}
+  icpt -> stop: "false" {class: off}
+  adapter -> ctrl: {class: flow}
+}
+
+req -> servlet.filter: {class: flow}
+servlet.filter -> mvc.ds: "chain.doFilter()" {class: flow}

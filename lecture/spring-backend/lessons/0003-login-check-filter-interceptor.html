@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로그인 체크: 필터와 인터셉터</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>3회차 · 로그인 체크: 필터와 인터셉터</h1>
+<p class="subtitle">스프링 MVC 2편 7장 · Spring Boot 4.1.1 · 용어는 <a href="../reference/glossary.html">용어집</a></p>
+
+<p><strong>오늘의 결과물.</strong> 로그인하지 않은 사용자가 <code>/items</code> 주소를 직접 쳐도 상품 화면에 들어가지 못하고 로그인 화면으로 간다. 로그인에 성공하면 처음 열려던 주소로 돌아간다. 로그인 검사는 컨트롤러마다 쓰지 않고 한곳에 둔다. 처음에는 서블릿 필터로 만들고, 같은 일을 스프링 인터셉터로 바꾼다. 마지막으로 홈 화면 컨트롤러가 <code>@Login Member</code> 파라미터 하나로 로그인 회원을 받게 한다.</p>
+<p class="muted">2회차에서는 홈 화면에만 상품 관리 버튼을 숨겼다. 주소를 직접 치면 그대로 들어간다 (교재 7장 18–24줄). 면접에서는 "필터와 인터셉터는 무엇이 다른가"를 묻는다.</p>
+
+<h2 id="flow">1. 동작 원리: 로그인하지 않은 사용자의 <code>GET /items</code></h2>
+<p>로그인하지 않은 사용자가 상품 목록을 열면 요청이 네 번 오간다. ① 첫 <code>GET /items</code>는 로그인 체크에 막혀 로그인 화면 주소를 응답으로 받는다. ⑤ 브라우저가 그 주소로 로그인 폼을 받는다. ⑥ 로그인 요청이 세션을 만든 뒤 원래 주소로 보내 주고, ⑦ 다시 보낸 <code>GET /items</code>는 검사를 통과한다. 아래 흐름은 오늘 마지막에 완성하는 인터셉터 버전이다. 필터 버전도 순서는 같고, ②③의 검사가 <code>DispatcherServlet</code>보다 앞에서 일어난다는 점만 다르다.</p>
+
+<table class="wrap">
+<thead><tr><th>등장 객체</th><th>역할</th></tr></thead>
+<tbody>
+<tr><td>브라우저</td><td>받은 <code>JSESSIONID</code> 쿠키를 보관해 요청마다 싣는다. 리다이렉트 응답을 받으면 <code>Location</code>의 주소로 새 GET을 보낸다.</td></tr>
+<tr><td>톰캣(WAS)</td><td>WAS(웹 애플리케이션 서버)는 HTTP 요청을 받아 자바 코드(서블릿)를 실행해 주는 서버이고, 스프링 부트는 톰캣을 내장해 쓴다. 톰캣은 요청을 받아 필터 체인을 거쳐 <code>DispatcherServlet</code>에 넘긴다. 세션 저장소(세션 ID → 세션 객체)도 톰캣 메모리에 있다.</td></tr>
+<tr><td><code>DispatcherServlet</code></td><td>스프링 MVC의 입구. 요청 주소를 처리할 컨트롤러 메서드(핸들러)를 찾고, 그 메서드를 부르기 전에 인터셉터의 <code>preHandle</code>을 등록 순서대로 부른다. 하나라도 <code>false</code>를 돌려주면 컨트롤러를 부르지 않는다.</td></tr>
+<tr><td><code>LogInterceptor</code></td><td>등록 순서 1번 인터셉터. 요청마다 로그를 남기고 항상 <code>true</code>를 돌려준다. 검사는 하지 않는다.</td></tr>
+<tr><td><code>LoginCheckInterceptor</code></td><td>등록 순서 2번 인터셉터. <strong>검사하고 분기한다.</strong> 세션에 <code>loginMember</code>가 없으면 <code>/login?redirectURL=원래경로</code>로 리다이렉트 응답을 정하고 <code>false</code>를 돌려준다. 있으면 <code>true</code>.</td></tr>
+<tr><td><code>LoginController</code></td><td>로그인 성공 뒤 쿼리 파라미터 <code>redirectURL</code>의 경로로 리다이렉트한다. 값이 없으면 <code>/</code>로 간다.</td></tr>
+<tr><td><code>ItemController</code></td><td>로그인 검사 코드가 없다. 인터셉터가 <code>true</code>를 돌려준 요청만 받는다.</td></tr>
+</tbody>
+</table>
+
+<div class="stepper">
+<fieldset class="step-tabs" aria-label="흐름 단계">
+<label><input type="radio" name="check-flow" value="1" checked>①</label>
+<label><input type="radio" name="check-flow" value="2">②</label>
+<label><input type="radio" name="check-flow" value="3">③</label>
+<label><input type="radio" name="check-flow" value="4">④</label>
+<label><input type="radio" name="check-flow" value="5">⑤</label>
+<label><input type="radio" name="check-flow" value="6">⑥</label>
+<label><input type="radio" name="check-flow" value="7">⑦</label>
+</fieldset>
+<figure>
+<!-- d2:login-check-flow -->
+<?xml version="1.0" encoding="utf-8"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" data-d2-version="v0.9.0" preserveAspectRatio="xMinYMin meet" viewBox="0 0 352 1336"><svg class="d2-1962829903 d2-svg" width="352" height="1336" viewBox="4 3 352 1336"><rect x="4" y="3" width="352" height="1336" rx="0" fill="var(--c-fffff8, #fffff8)" class=" fill-N7" stroke-width="0" /><style type="text/css"><![CDATA[
+@keyframes dashdraw {
+	from {
+		stroke-dashoffset: 0;
+	}
+}
+
+.d2-1962829903 .text-bold {
+	font-family: "d2-1962829903-font-bold";
+}
+
+.d2-1962829903 .text-italic {
+	font-family: "d2-1962829903-font-italic";
+}
+]]></style><style type="text/css"><![CDATA[.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-1962829903 .fill-N1{fill:var(--c-1f1f1f, #1f1f1f);}
+		.d2-1962829903 .fill-N2{fill:var(--c-6b6b6b, #6b6b6b);}
+		.d2-1962829903 .fill-N7{fill:var(--c-fffff8, #fffff8);}
+		.d2-1962829903 .stroke-B2{stroke:var(--c-666666, #666666);}.appendix text.text{fill:var(--c-1f1f1f, #1f1f1f)}.md{--color-fg-default:#1f1f1f;--color-fg-muted:#6b6b6b;--color-fg-subtle:#9499AB;--color-canvas-default:#fffff8;--color-canvas-subtle:#EEF1F8;--color-border-default:#666666;--color-border-muted:#666666;--color-neutral-muted:#EEF1F8;--color-accent-fg:#666666;--color-accent-emphasis:#666666;--color-attention-subtle:#6b6b6b;--color-danger-fg:red;}.light-code{display: block}.dark-code{display: none}]]></style><g class="czE= input S1"><g class="shape" ><rect x="135" y="12" width="137" height="78" rx="6" stroke="var(--c-666666, #666666)" fill="var(--c-f5f5f5, #f5f5f5)" style="stroke-width:1;" /></g><text x="203.5" y="48.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="203.5" dy="0">① GET /items</tspan><tspan x="203.5" dy="16.5">쿠키 없음</tspan></text></g><g class="czI= step S2"><g class="shape" ><rect x="68" y="160" width="270" height="78" rx="6" stroke="var(--c-6c8ebf, #6c8ebf)" fill="var(--c-dae8fc, #dae8fc)" style="stroke-width:1;" /></g><text x="203" y="196.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="203" dy="0">② DispatcherServlet</tspan><tspan x="203" dy="16.5">핸들러를 찾고 preHandle 호출</tspan></text></g><g class="czM= step S3"><g class="shape" ><rect x="95" y="308" width="216" height="78" rx="6" stroke="var(--c-6c8ebf, #6c8ebf)" fill="var(--c-dae8fc, #dae8fc)" style="stroke-width:1;" /></g><text x="203" y="344.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="203" dy="0">③ LoginCheckInterceptor</tspan><tspan x="203" dy="16.5">getSession(false) → null</tspan></text></g><g class="czQ= done S4"><g class="shape" ><rect x="60" y="548" width="287" height="78" rx="6" stroke="var(--c-82b366, #82b366)" fill="var(--c-d5e8d4, #d5e8d4)" style="stroke-width:1;" /></g><text x="203.5" y="584.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="203.5" dy="0">④ 리다이렉트 응답</tspan><tspan x="203.5" dy="16.5">Location: /login?redirectURL=/items</tspan></text></g><g class="czU= input S5"><g class="shape" ><rect x="68" y="696" width="271" height="78" rx="6" stroke="var(--c-666666, #666666)" fill="var(--c-f5f5f5, #f5f5f5)" style="stroke-width:1;" /></g><text x="203.5" y="732.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="203.5" dy="0">⑤ GET /login?redirectURL=/items</tspan><tspan x="203.5" dy="16.5">제외 경로 → 로그인 폼</tspan></text></g><g class="czY= step S6"><g class="shape" ><rect x="63" y="844" width="281" height="78" rx="6" stroke="var(--c-6c8ebf, #6c8ebf)" fill="var(--c-dae8fc, #dae8fc)" style="stroke-width:1;" /></g><text x="203.5" y="880.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="203.5" dy="0">⑥ POST /login?redirectURL=/items</tspan><tspan x="203.5" dy="16.5">세션 생성, redirect:/items</tspan></text></g><g class="czc= done S7"><g class="shape" ><rect x="25" y="1094" width="202" height="78" rx="6" stroke="var(--c-82b366, #82b366)" fill="var(--c-d5e8d4, #d5e8d4)" style="stroke-width:1;" /></g><text x="126" y="1130.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="126" dy="0">⑦ GET /items + Cookie</tspan><tspan x="126" dy="16.5">통과 → ItemController</tspan></text></g><g class="c3RvcmU= data"><g class="shape" ><rect x="83" y="1252" width="241" height="78" rx="6" stroke="var(--c-d6b656, #d6b656)" fill="var(--c-fff2cc, #fff2cc)" style="stroke-width:1;" /></g><text x="203.5" y="1288.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="203.5" dy="0">세션 저장소(톰캣 메모리)</tspan><tspan x="203.5" dy="16.5">ABC… → 회원 test</tspan></text></g><g class="KHMxIC0mZ3Q7IHMyKVswXQ== flow"><marker id="mk-d2-1962829903-1262156804" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="var(--c-666666, #666666)" class="connection" stroke-width="2" /> </marker><path d="M 203.75 91.5 L 203.75 156.5" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-1962829903-1262156804)" mask="url(#d2-1962829903)" /></g><g class="KHMyIC0mZ3Q7IHMzKVswXQ== flow"><path d="M 203.75 239.5 L 203.75 304.5" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-1962829903-1262156804)" mask="url(#d2-1962829903)" /></g><g class="KHMzIC0mZ3Q7IHM0KVswXQ== flow"><path d="M 203.75 387.5 L 203.75 544.5" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-1962829903-1262156804)" mask="url(#d2-1962829903)" /><text x="203.5" y="472" fill="var(--c-6b6b6b, #6b6b6b)" class="text-italic fill-N2" style="text-anchor:middle;font-size:16px">false</text></g><g class="KHM0IC0mZ3Q7IHM1KVswXQ== flow"><path d="M 203.75 627.5 L 203.75 692.5" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-1962829903-1262156804)" mask="url(#d2-1962829903)" /></g><g class="KHM1IC0mZ3Q7IHM2KVswXQ== flow"><path d="M 203.75 775.5 L 203.75 840.5" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-1962829903-1262156804)" mask="url(#d2-1962829903)" /></g><g class="KHM2IC0mZ3Q7IHM3KVswXQ== flow"><path d="M 126.5 923.5 L 126.5 1090.5" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-1962829903-1262156804)" mask="url(#d2-1962829903)" /><text x="126.5" y="1013" fill="var(--c-6b6b6b, #6b6b6b)" class="text-italic fill-N2" style="text-anchor:middle;font-size:16px">Set-Cookie: JSESSIONID=ABC…</text></g><g class="KHM2IC0mZ3Q7IHN0b3JlKVswXQ== save"><marker id="mk-d2-1962829903-480943814" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="var(--c-d79b00, #d79b00)" class="connection" stroke-width="2" /> </marker><path d="M 281 923.5 L 281 1248.5" stroke="var(--c-d79b00, #d79b00)" fill="none" class="connection animated-connection" style="stroke-width:2;stroke-dasharray:10.000000,9.865639;stroke-dashoffset:-198.656393;animation: dashdraw 4.932820s linear infinite;" marker-end="url(#mk-d2-1962829903-480943814)" mask="url(#d2-1962829903)" /></g><g class="KHM3IC0mZ3Q7IHN0b3JlKVswXQ== flow"><path d="M 163.582993 1173.5 L 163.582993 1248.5" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-1962829903-1262156804)" mask="url(#d2-1962829903)" /></g><mask id="d2-1962829903" maskUnits="userSpaceOnUse" x="4" y="3" width="352" height="1336">
+<rect x="4" y="3" width="352" height="1336" fill="white"></rect>
+<rect x="185" y="456" width="37" height="22" fill="black"></rect>
+<rect x="10" y="997" width="233" height="22" fill="black"></rect>
+</mask></svg></svg>
+
+<!-- /d2 -->
+<figcaption>단계 번호를 누르면 그 상자와 아래 표의 줄이 함께 강조된다. 세션 ID <code>ABC…</code>는 예시 값이다.</figcaption>
+</figure>
+<ul class="legend">
+<li class="input">브라우저가 보낸 요청</li>
+<li class="step">서버 처리</li>
+<li class="done">응답·화면</li>
+<li class="data">서버에 남는 데이터</li>
+</ul>
+<table class="wrap">
+<thead><tr><th>단계</th><th>누가, 무엇을</th><th>브라우저 쿠키</th><th>세션 저장소</th></tr></thead>
+<tbody>
+<tr data-step="1"><td>① 요청</td><td>브라우저가 <code>GET /items</code>를 보낸다. 로그인한 적이 없어 쿠키가 없다.</td><td>없음</td><td>비어 있음</td></tr>
+<tr data-step="2"><td>② 핸들러 찾기</td><td>톰캣이 요청을 <code>DispatcherServlet</code>에 넘긴다. <code>DispatcherServlet</code>은 <code>/items</code>를 처리할 핸들러로 <code>ItemController</code>의 목록 메서드를 찾고, 부르기 전에 인터셉터의 <code>preHandle</code>을 순서대로 부른다. 1번 <code>LogInterceptor</code>는 로그를 남기고 <code>true</code>를 돌려준다.</td><td>없음</td><td>비어 있음</td></tr>
+<tr data-step="3"><td>③ 로그인 체크</td><td>2번 <code>LoginCheckInterceptor</code>가 <code>request.getSession(false)</code>를 부른다. 요청에 쿠키가 없으니 <code>null</code>이다. <code>response.sendRedirect("/login?redirectURL=/items")</code>로 응답을 정하고 <code>false</code>를 돌려준다. <code>DispatcherServlet</code>은 컨트롤러를 부르지 않는다.</td><td>없음</td><td>비어 있음</td></tr>
+<tr data-step="4"><td>④ 응답</td><td>상태 302, <code>Location: /login?redirectURL=/items</code>로 응답한다. 세션을 만들지 않았으니 <code>Set-Cookie</code>는 없다.</td><td>없음</td><td>비어 있음</td></tr>
+<tr data-step="5"><td>⑤ 로그인 폼</td><td>브라우저가 <code>Location</code>의 주소로 GET을 보낸다. <code>/login</code>은 <code>LoginCheckInterceptor</code>의 제외 경로라 검사 없이 <code>LoginController</code>가 로그인 폼을 그린다. 주소창에는 <code>?redirectURL=/items</code>가 남아 있다.</td><td>없음</td><td>비어 있음</td></tr>
+<tr data-step="6"><td>⑥ 로그인</td><td><code>test</code> / <code>test!</code>로 폼을 제출하면 <code>POST /login?redirectURL=/items</code>가 간다. <code>LoginController</code>가 검증과 로그인 검사를 마치고 <code>request.getSession()</code>으로 새 세션을 만들어 <code>loginMember</code>를 넣는다. 파라미터로 받은 <code>redirectURL</code> 값 <code>/items</code>로 <code>"redirect:/items"</code>를 반환한다. 새 세션이 생겼으니 톰캣이 <code>Set-Cookie: JSESSIONID=ABC…</code>를 붙인다.</td><td><code>JSESSIONID=ABC…</code> 저장</td><td><code>ABC…</code> → <code>loginMember</code>=회원 test</td></tr>
+<tr data-step="7"><td>⑦ 다시 상품 목록</td><td>브라우저가 <code>GET /items</code>에 <code>Cookie: JSESSIONID=ABC…</code>를 싣는다. <code>LoginCheckInterceptor</code>가 <code>getSession(false)</code>로 세션을 찾고, 그 안에 <code>loginMember</code>가 있으니 <code>true</code>를 돌려준다. <code>DispatcherServlet</code>이 <code>ItemController</code>를 불러 상품 목록을 그린다.</td><td><code>JSESSIONID=ABC…</code></td><td>같음</td></tr>
+</tbody>
+</table>
+</div>
+<p>검사도 분기도 <code>LoginCheckInterceptor</code> 한곳이 한다. 상품 컨트롤러가 늘어도 로그인 검사 코드는 늘지 않고, 로그인 정책이 바뀌면 이 한곳만 고친다 (교재 7장 24–26줄, 330줄). 여러 기능이 공통으로 필요로 하는 이런 일을 공통 관심사라고 한다.</p>
+<p class="muted">⑥에서 로그인 폼이 쿼리 파라미터 <code>redirectURL</code>까지 함께 보내는지는 공식 문서에서 찾지 못했다. 폼의 <code>&lt;form&gt;</code>에는 <code>th:action</code>이 값 없이 붙어 있다. 7절 A-4에서 브라우저로 직접 확인한다.</p>
+
+<h2 id="where">2. 필터와 인터셉터는 어디에 끼어드는가</h2>
+<p>필터는 서블릿이 제공하는 기술이고, 인터셉터는 스프링 MVC가 제공하는 기술이다. 둘 다 웹의 공통 관심사를 처리하지만 끼어드는 위치가 다르다 (교재 7장 340–349줄).</p>
+<pre><code>HTTP 요청 -&gt; WAS -&gt; 필터 -&gt; 서블릿(DispatcherServlet) -&gt; 스프링 인터셉터 -&gt; 컨트롤러</code></pre>
+<figure>
+<!-- d2:request-pipeline -->
+<?xml version="1.0" encoding="utf-8"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" data-d2-version="v0.9.0" preserveAspectRatio="xMinYMin meet" viewBox="0 0 521 1495"><svg class="d2-2630301287 d2-svg" width="521" height="1495" viewBox="3 3 521 1495"><rect x="3" y="3" width="521" height="1495" rx="0" fill="var(--c-fffff8, #fffff8)" class=" fill-N7" stroke-width="0" /><style type="text/css"><![CDATA[
+.d2-2630301287 .text-bold {
+	font-family: "d2-2630301287-font-bold";
+}
+
+.d2-2630301287 .text-italic {
+	font-family: "d2-2630301287-font-italic";
+}
+]]></style><style type="text/css"><![CDATA[.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-2630301287 .fill-N1{fill:var(--c-1f1f1f, #1f1f1f);}
+		.d2-2630301287 .fill-N2{fill:var(--c-6b6b6b, #6b6b6b);}
+		.d2-2630301287 .fill-N7{fill:var(--c-fffff8, #fffff8);}
+		.d2-2630301287 .stroke-B2{stroke:var(--c-666666, #666666);}.appendix text.text{fill:var(--c-1f1f1f, #1f1f1f)}.md{--color-fg-default:#1f1f1f;--color-fg-muted:#6b6b6b;--color-fg-subtle:#9499AB;--color-canvas-default:#fffff8;--color-canvas-subtle:#EEF1F8;--color-border-default:#666666;--color-border-muted:#666666;--color-neutral-muted:#EEF1F8;--color-accent-fg:#666666;--color-accent-emphasis:#666666;--color-attention-subtle:#6b6b6b;--color-danger-fg:red;}.light-code{display: block}.dark-code{display: none}]]></style><g class="cmVx input"><g class="shape" ><rect x="155" y="12" width="120" height="78" rx="6" stroke="var(--c-666666, #666666)" fill="var(--c-f5f5f5, #f5f5f5)" style="stroke-width:1;" /></g><text x="215" y="48.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="215" dy="0">HTTP 요청</tspan><tspan x="215" dy="16.5">GET /items</tspan></text></g><g class="c2VydmxldA== group"><g class="shape" ><rect x="12" y="165" width="331" height="428" rx="10" stroke="var(--c-ddd8c8, #ddd8c8)" fill="var(--c-f8f8f4, #f8f8f4)" style="stroke-width:1;" /></g><text x="86" y="184" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px">서블릿 영역(톰캣)</text></g><g class="bXZj group"><g class="shape" ><rect x="30" y="765" width="485" height="724" rx="10" stroke="var(--c-ddd8c8, #ddd8c8)" fill="var(--c-f8f8f4, #f8f8f4)" style="stroke-width:1;" /></g><text x="99.5" y="784" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px">스프링 MVC 영역</text></g><g class="c2VydmxldC5maWx0ZXI= step"><g class="shape" ><rect x="138" y="215" width="155" height="78" rx="6" stroke="var(--c-6c8ebf, #6c8ebf)" fill="var(--c-dae8fc, #dae8fc)" style="stroke-width:1;" /></g><text x="215.5" y="251.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="215.5" dy="0">필터 체인</tspan><tspan x="215.5" dy="16.5">LoginCheckFilter</tspan></text></g><g class="c2VydmxldC5zdG9w stop"><g class="shape" ><rect x="62" y="465" width="178" height="78" rx="6" stroke="var(--c-b85450, #b85450)" fill="var(--c-f8cecc, #f8cecc)" style="stroke-width:1;" /></g><text x="151" y="501.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="151" dy="0">응답 후 종료</tspan><tspan x="151" dy="16.5">서블릿 호출 없음</tspan></text></g><g class="bXZjLmRz step"><g class="shape" ><rect x="193" y="815" width="173" height="78" rx="6" stroke="var(--c-6c8ebf, #6c8ebf)" fill="var(--c-dae8fc, #dae8fc)" style="stroke-width:1;" /></g><text x="279.5" y="851.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="279.5" dy="0">DispatcherServlet</tspan><tspan x="279.5" dy="16.5">핸들러를 찾는다</tspan></text></g><g class="bXZjLmljcHQ= step"><g class="shape" ><rect x="202" y="963" width="155" height="78" rx="6" stroke="var(--c-6c8ebf, #6c8ebf)" fill="var(--c-dae8fc, #dae8fc)" style="stroke-width:1;" /></g><text x="279.5" y="999.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="279.5" dy="0">인터셉터 체인</tspan><tspan x="279.5" dy="16.5">preHandle</tspan></text></g><g class="bXZjLnN0b3A= stop"><g class="shape" ><rect x="80" y="1213" width="196" height="78" rx="6" stroke="var(--c-b85450, #b85450)" fill="var(--c-f8cecc, #f8cecc)" style="stroke-width:1;" /></g><text x="178" y="1249.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="178" dy="0">응답 후 종료</tspan><tspan x="178" dy="16.5">컨트롤러 호출 없음</tspan></text></g><g class="bXZjLmFkYXB0ZXI= step"><g class="shape" ><rect x="296" y="1213" width="169" height="78" rx="6" stroke="var(--c-6c8ebf, #6c8ebf)" fill="var(--c-dae8fc, #dae8fc)" style="stroke-width:1;" /></g><text x="380.5" y="1249.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="380.5" dy="0">핸들러 어댑터</tspan><tspan x="380.5" dy="16.5">ArgumentResolver</tspan></text></g><g class="bXZjLmN0cmw= done"><g class="shape" ><rect x="310" y="1361" width="142" height="78" rx="6" stroke="var(--c-82b366, #82b366)" fill="var(--c-d5e8d4, #d5e8d4)" style="stroke-width:1;" /></g><text x="381" y="1397.5" fill="var(--c-1f1f1f, #1f1f1f)" class="text-bold fill-N1" style="text-anchor:middle;font-size:14px"><tspan x="381" dy="0">컨트롤러</tspan><tspan x="381" dy="16.5">ItemController</tspan></text></g><g class="c2VydmxldC4oZmlsdGVyIC0mZ3Q7IHN0b3ApWzBd off" style='opacity:0.6'><marker id="mk-d2-2630301287-3583762319" markerWidth="10" markerHeight="12" refX="8.5" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="var(--c-666666, #666666)" class="connection" stroke-width="1" /> </marker><path d="M 151 294 L 151 463" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:1;stroke-dasharray:3.000000,3.000000;" marker-end="url(#mk-d2-2630301287-3583762319)" mask="url(#d2-2630301287)" /><text x="151.5" y="384" fill="var(--c-6b6b6b, #6b6b6b)" class="text-italic fill-N2" style="text-anchor:middle;font-size:16px">return</text></g><g class="bXZjLihkcyAtJmd0OyBpY3B0KVswXQ== flow"><marker id="mk-d2-2630301287-1262156804" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="var(--c-666666, #666666)" class="connection" stroke-width="2" /> </marker><path d="M 280 894.5 L 280 959.5" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-2630301287-1262156804)" mask="url(#d2-2630301287)" /></g><g class="bXZjLihpY3B0IC0mZ3Q7IGFkYXB0ZXIpWzBd flow"><path d="M 305.833008 1042.5 L 305.833008 1071 S 305.833008 1081 315.833008 1081 L 371.25 1081 S 381.25 1081 381.25 1091 L 381.25 1209.5" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-2630301287-1262156804)" mask="url(#d2-2630301287)" /><text x="381.5" y="1094" fill="var(--c-6b6b6b, #6b6b6b)" class="text-italic fill-N2" style="text-anchor:middle;font-size:16px">true</text></g><g class="bXZjLihpY3B0IC0mZ3Q7IHN0b3ApWzBd off" style='opacity:0.6'><path d="M 254.166 1042 L 254.166 1211" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:1;stroke-dasharray:3.000000,3.000000;" marker-end="url(#mk-d2-2630301287-3583762319)" mask="url(#d2-2630301287)" /><text x="254.5" y="1132" fill="var(--c-6b6b6b, #6b6b6b)" class="text-italic fill-N2" style="text-anchor:middle;font-size:16px">false</text></g><g class="bXZjLihhZGFwdGVyIC0mZ3Q7IGN0cmwpWzBd flow"><path d="M 381.25 1292.5 L 381.25 1357.5" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-2630301287-1262156804)" mask="url(#d2-2630301287)" /></g><g class="KHJlcSAtJmd0OyBzZXJ2bGV0LmZpbHRlcilbMF0= flow"><path d="M 215.5 91.5 L 215.5 211.5" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-2630301287-1262156804)" mask="url(#d2-2630301287)" /></g><g class="KHNlcnZsZXQuZmlsdGVyIC0mZ3Q7IG12Yy5kcylbMF0= flow"><path d="M 280 294.5 L 280 811.5" stroke="var(--c-666666, #666666)" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-2630301287-1262156804)" mask="url(#d2-2630301287)" /><text x="280" y="559" fill="var(--c-6b6b6b, #6b6b6b)" class="text-italic fill-N2" style="text-anchor:middle;font-size:16px">chain.doFilter()</text></g><mask id="d2-2630301287" maskUnits="userSpaceOnUse" x="3" y="3" width="521" height="1495">
+<rect x="3" y="3" width="521" height="1495" fill="white"></rect>
+<rect x="128" y="368" width="47" height="22" fill="black"></rect>
+<rect x="365" y="1078" width="33" height="22" fill="black"></rect>
+<rect x="236" y="1116" width="37" height="22" fill="black"></rect>
+<rect x="225" y="543" width="110" height="22" fill="black"></rect>
+</mask></svg></svg>
+
+<!-- /d2 -->
+<figcaption>요청 한 건이 지나가는 순서. 필터는 <code>chain.doFilter()</code>를 부르지 않으면, 인터셉터는 <code>preHandle</code>이 <code>false</code>를 돌려주면 그 자리에서 요청이 끝난다.</figcaption>
+</figure>
+<ul class="legend">
+<li class="input">브라우저가 보낸 요청</li>
+<li class="step">서버 처리</li>
+<li class="done">컨트롤러</li>
+<li class="stop">요청을 막고 끝냄</li>
+</ul>
+
+<table class="wrap">
+<thead><tr><th></th><th>서블릿 필터</th><th>스프링 인터셉터</th></tr></thead>
+<tbody>
+<tr><td>제공</td><td>서블릿 표준(<code>jakarta.servlet.Filter</code>)</td><td>스프링 MVC(<code>HandlerInterceptor</code>)</td></tr>
+<tr><td>위치</td><td><code>DispatcherServlet</code> 앞</td><td><code>DispatcherServlet</code> 뒤, 컨트롤러 호출 직전 (교재 7장 348줄)</td></tr>
+<tr><td>요청을 막는 법</td><td><code>chain.doFilter()</code>를 부르지 않고 <code>return</code> (교재 7장 136–137, 262줄)</td><td><code>preHandle</code>이 <code>false</code>를 반환 (교재 7장 400줄)</td></tr>
+<tr><td>호출 시점</td><td><code>doFilter</code> 하나. 그 안에서 <code>chain.doFilter()</code> 앞뒤에 코드를 둔다</td><td><code>preHandle</code>(컨트롤러 전), <code>postHandle</code>(컨트롤러 후), <code>afterCompletion</code>(뷰 렌더링 후)로 나뉜다 (교재 7장 390줄)</td></tr>
+<tr><td>받는 정보</td><td><code>request</code>, <code>response</code></td><td>그에 더해 호출될 핸들러(<code>handler</code>)와 <code>ModelAndView</code> (교재 7장 391줄)</td></tr>
+<tr><td>경로 지정</td><td><code>addUrlPatterns</code>에 서블릿 URL 패턴(<code>/*</code>)으로 적용할 곳을 정한다 (교재 7장 170–174줄). 오늘 코드는 뺄 경로를 필터 안의 화이트리스트로 거른다 (교재 7장 257줄)</td><td><code>addPathPatterns</code>, <code>excludePathPatterns</code>로 넣을 곳과 뺄 곳을 등록한다 (교재 7장 525, 632줄)</td></tr>
+<tr><td>필터만 되는 것</td><td><code>chain.doFilter(request, response)</code>에 다른 <code>request</code>·<code>response</code> 객체를 넘겨 바꿔치기할 수 있다 (교재 7장 334줄)</td><td>안 된다</td></tr>
+</tbody>
+</table>
+<p>교재의 결론은 "스프링 MVC를 사용하고, 특별히 필터를 꼭 사용해야 하는 상황이 아니라면 인터셉터를 사용하는 것이 더 편리하다"이다 (교재 7장 421줄).</p>
+
+<h3>인터셉터의 세 메서드는 언제 불리는가</h3>
+<figure>
+<img src="../assets/images/interceptor-flow.png" alt="DispatcherServlet이 1 preHandle, 2 핸들러 어댑터를 통한 컨트롤러 호출, 3 ModelAndView 반환, 4 postHandle, 5 뷰 렌더링, 6 afterCompletion 순서로 진행하는 그림">
+<figcaption>정상 흐름. <code>preHandle</code>은 핸들러 어댑터 호출 전, <code>postHandle</code>은 핸들러 어댑터 호출 후, <code>afterCompletion</code>은 뷰 렌더링 뒤에 불린다. 출처: 김영한 「스프링 MVC 2편」 7장 395줄 그림.</figcaption>
+</figure>
+<figure>
+<img src="../assets/images/interceptor-exception.png" alt="컨트롤러에서 예외가 나면 postHandle은 호출되지 않고 afterCompletion이 예외를 받아 호출된 뒤 예외가 WAS로 전달되는 그림">
+<figcaption>컨트롤러에서 예외가 난 흐름. <code>postHandle</code>은 불리지 않고, <code>afterCompletion</code>은 예외(<code>ex</code>)를 받아 불린다. 출처: 김영한 「스프링 MVC 2편」 7장 406줄 그림.</figcaption>
+</figure>
+<ul>
+<li><code>preHandle</code>이 <code>false</code>를 돌려주면 뒤의 인터셉터와 핸들러 어댑터가 호출되지 않는다 (교재 7장 400줄).</li>
+<li><code>afterCompletion</code>은 핸들러 실행 결과와 상관없이 불린다. 다만 그 인터셉터 자신의 <code>preHandle</code>이 <code>true</code>를 돌려준 경우에만 불린다 (<a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/HandlerInterceptor.html">HandlerInterceptor API</a>, <code>afterCompletion</code> 항목).</li>
+<li>그래서 요청이 끝났다는 로그처럼 예외와 상관없이 해야 하는 일은 <code>postHandle</code>이 아니라 <code>afterCompletion</code>에 둔다 (교재 7장 416, 499줄).</li>
+</ul>
+
+<h2 id="summary">3. 핵심 요약</h2>
+<table class="wrap">
+<thead><tr><th>코드·설정</th><th>동작</th></tr></thead>
+<tbody>
+<tr><td><code>chain.doFilter(request, response)</code></td><td>다음 필터가 있으면 그 필터를, 없으면 서블릿을 부른다. 부르지 않으면 다음 단계로 진행하지 않는다 (교재 7장 136–137줄).</td></tr>
+<tr><td><code>response.sendRedirect(주소)</code> 뒤 <code>return;</code></td><td>필터에서 리다이렉트 응답을 정하고 끝낸다. 뒤의 필터, 서블릿, 컨트롤러가 모두 호출되지 않는다 (교재 7장 262줄).</td></tr>
+<tr><td><code>preHandle</code>에서 <code>return false;</code></td><td>인터셉터에서 같은 일을 한다. 리다이렉트는 <code>return false</code> 앞에서 <code>response.sendRedirect</code>로 정한다 (교재 7장 593–594줄).</td></tr>
+<tr><td><code>request.getSession()</code></td><td><code>getSession(true)</code>와 같다. 세션이 있으면 그것을, 없으면 새로 만들어 돌려준다. 새로 만들면 톰캣이 응답에 <code>Set-Cookie: JSESSIONID=…</code>를 붙인다(2회차 실행 결과).</td></tr>
+<tr><td><code>request.getSession(false)</code></td><td>세션이 있으면 그것을, 없으면 <code>null</code>을 돌려준다. 새로 만들지 않는다 (<a href="https://jakarta.ee/specifications/servlet/6.1/apidocs/jakarta.servlet/jakarta/servlet/http/HttpServletRequest.html#getSession(boolean)">Servlet 6.1 API</a>). 2회차에서 모르는 <code>JSESSIONID</code>를 보냈을 때도 "세션 없음"으로 처리됐다.</td></tr>
+<tr><td>화이트리스트</td><td>인증과 상관없이 항상 허용하는 경로 목록. 필터는 이 목록을 코드로 들고 있다가 목록에 없는 경로만 검사한다. 홈, 회원 가입, 로그인, CSS는 로그인 전에도 열려야 한다 (교재 7장 257줄).</td></tr>
+<tr><td><code>"/login?redirectURL=" + requestURI</code></td><td>막힌 요청의 경로를 쿼리 파라미터로 로그인 화면에 넘긴다. 로그인에 성공하면 <code>LoginController</code>가 그 경로로 돌려보낸다 (교재 7장 261, 322줄).</td></tr>
+<tr><td><code>@Login Member member</code></td><td>직접 만든 <code>ArgumentResolver</code>가 세션의 로그인 회원을 꺼내 파라미터에 넣는다. 세션이 없으면 <code>null</code>이다 (교재 7장 666줄).</td></tr>
+</tbody>
+</table>
+
+<h2 id="boot4">4. Boot 4.1 차이</h2>
+<ul>
+<li>필터 쪽 타입은 모두 <code>jakarta.servlet</code>에서 import한다: <code>Filter</code>, <code>FilterChain</code>, <code>ServletRequest</code>, <code>ServletResponse</code>, <code>ServletException</code>, <code>jakarta.servlet.http.*</code>. 교재 코드는 <code>javax.servlet</code>을 쓴다 (교재 7장 206–209줄). Boot 4.1은 Servlet 6.1 기반이다 (<a href="https://docs.spring.io/spring-boot/system-requirements.html">Boot: System Requirements</a>).</li>
+<li>Servlet 6.1의 <code>Filter</code>에서 <code>init</code>과 <code>destroy</code>는 default 메서드다. <code>doFilter</code>만 구현하면 된다 (<a href="https://jakarta.ee/specifications/servlet/6.1/apidocs/jakarta.servlet/jakarta/servlet/Filter.html">Servlet 6.1: Filter</a>).</li>
+<li><code>FilterRegistrationBean</code>의 패키지는 그대로 <code>org.springframework.boot.web.servlet</code>이다 (<a href="https://docs.spring.io/spring-boot/api/java/org/springframework/boot/web/servlet/FilterRegistrationBean.html">Boot API: FilterRegistrationBean</a>).</li>
+<li><code>HandlerInterceptor</code>의 세 메서드는 모두 default다. 필요한 메서드만 구현한다 (<a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/HandlerInterceptor.html">HandlerInterceptor API</a>).</li>
+<li>인터셉터 경로 패턴은 <code>PathPattern</code> 문법을 따른다 (<a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/config/annotation/InterceptorRegistration.html">InterceptorRegistration API</a>). <code>PathPattern</code>에서 <code>**</code>는 패턴 끝에만 쓸 수 있다. <code>/pages/**/details</code> 같은 패턴은 쓰지 않는다 (<a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/util/pattern/PathPattern.html">PathPattern API</a>). 오늘 쓰는 <code>/**</code>, <code>/css/**</code>, <code>/*.ico</code>는 이 조건에 맞는다.</li>
+</ul>
+<table class="wrap">
+<thead><tr><th>패턴</th><th>뜻 (교재 7장 546–551줄)</th></tr></thead>
+<tbody>
+<tr><td><code>?</code></td><td>한 글자</td></tr>
+<tr><td><code>*</code></td><td>경로 한 칸(<code>/</code>와 <code>/</code> 사이) 안의 0개 이상 글자. <code>/*.ico</code>는 <code>/favicon.ico</code>에 맞고 <code>/a/favicon.ico</code>에는 맞지 않는다.</td></tr>
+<tr><td><code>**</code></td><td>경로 끝까지 0개 이상의 경로 칸. <code>/css/**</code>는 <code>/css/bootstrap.min.css</code>에도 <code>/css/a/b.css</code>에도 맞는다.</td></tr>
+</tbody>
+</table>
+
+<h2 id="api">5. 오늘 쓰는 API</h2>
+<table class="wrap">
+<thead><tr><th>이름</th><th>한 줄 설명</th></tr></thead>
+<tbody>
+<tr><td><code>Filter</code></td><td><code>jakarta.servlet.Filter</code>. <code>doFilter(ServletRequest, ServletResponse, FilterChain)</code>를 구현한다. 요청이 올 때마다 불린다. 서블릿 컨테이너가 싱글톤으로 하나 만들어 쓴다 (교재 7장 71–75줄).</td></tr>
+<tr><td><code>FilterChain</code></td><td><code>chain.doFilter(request, response)</code>로 다음 필터나 서블릿을 부른다.</td></tr>
+<tr><td><code>HttpServletRequest</code> 형변환</td><td><code>doFilter</code>는 <code>ServletRequest</code>를 받는다. 세션과 URI를 쓰려면 <code>(HttpServletRequest) request</code>로 바꾼다 (교재 7장 130줄). 응답도 <code>(HttpServletResponse) response</code>.</td></tr>
+<tr><td><code>getRequestURI()</code></td><td>요청 주소에서 쿼리 문자열을 뺀 경로. <code>/items?x=1</code>이면 <code>/items</code> (<a href="https://jakarta.ee/specifications/servlet/6.1/apidocs/jakarta.servlet/jakarta/servlet/http/HttpServletRequest.html#getRequestURI()">Servlet 6.1 API</a>).</td></tr>
+<tr><td><code>sendRedirect(주소)</code></td><td><code>HttpServletResponse</code>의 메서드. 그 주소로 가라는 리다이렉트 응답을 보낸다 (<a href="https://jakarta.ee/specifications/servlet/6.1/apidocs/jakarta.servlet/jakarta/servlet/http/HttpServletResponse.html#sendRedirect(java.lang.String)">Servlet 6.1 API</a>).</td></tr>
+<tr><td><code>PatternMatchUtils.simpleMatch(패턴 배열, 문자열)</code></td><td><code>org.springframework.util</code>. 문자열이 패턴 중 하나와 같거나 <code>xxx*</code>, <code>*xxx</code>, <code>*xxx*</code> 꼴에 맞으면 <code>true</code> (<a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/util/PatternMatchUtils.html">API</a>).</td></tr>
+<tr><td><code>@Configuration</code>, <code>@Bean</code></td><td><code>@Configuration</code> 클래스 안의 <code>@Bean</code> 메서드가 돌려준 객체를 스프링이 빈으로 등록한다 (<a href="https://docs.spring.io/spring-framework/reference/core/beans/java/basic-concepts.html">Spring: @Bean and @Configuration</a>).</td></tr>
+<tr><td><code>FilterRegistrationBean&lt;Filter&gt;</code></td><td>필터를 등록하는 빈. <code>setFilter</code>(등록할 필터), <code>setOrder(번호)</code>(낮을수록 먼저), <code>addUrlPatterns("/*")</code>(적용할 경로) (교재 7장 166–170줄).</td></tr>
+<tr><td><code>WebMvcConfigurer</code></td><td>스프링 MVC 설정을 더하는 인터페이스. 오늘은 <code>addInterceptors</code>와 <code>addArgumentResolvers</code>를 재정의한다 (<a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/config/annotation/WebMvcConfigurer.html">API</a>).</td></tr>
+<tr><td><code>HandlerInterceptor</code></td><td><code>org.springframework.web.servlet</code>. <code>preHandle</code>(<code>boolean</code> 반환), <code>postHandle</code>, <code>afterCompletion</code>.</td></tr>
+<tr><td><code>registry.addInterceptor(…)</code></td><td><code>.order(번호)</code>(낮을수록 먼저), <code>.addPathPatterns(…)</code>(적용할 경로), <code>.excludePathPatterns(…)</code>(뺄 경로)를 이어 쓴다 (교재 7장 520–523줄).</td></tr>
+<tr><td><code>request.setAttribute(이름, 값)</code></td><td>요청 하나 동안만 사는 저장 공간에 값을 넣는다. <code>getAttribute(이름)</code>로 꺼낸다. 인터셉터는 싱글톤이라 필드에 요청별 값을 두면 위험하다. <code>preHandle</code>의 값을 <code>afterCompletion</code>에서 쓰려면 여기에 둔다 (교재 7장 483줄). 세션 속성과 달리 응답이 끝나면 사라진다.</td></tr>
+<tr><td><code>@RequestParam(defaultValue = "/")</code></td><td>쿼리 파라미터나 폼 값 하나를 받는다. 파라미터가 없거나 빈 값이면 <code>defaultValue</code>를 쓴다 (<a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/bind/annotation/RequestParam.html#defaultValue()">RequestParam API</a>).</td></tr>
+<tr><td><code>@Slf4j</code></td><td>Lombok. 클래스에 <code>log</code> 필드를 만든다. <code>log.info("A [{}]", 값)</code>은 <code>{}</code> 자리에 값을 넣어 앱 터미널에 출력한다 (<a href="https://projectlombok.org/features/log">Lombok: @Log</a>).</td></tr>
+<tr><td><code>UUID.randomUUID().toString()</code></td><td><code>java.util.UUID</code>. 겹치지 않는 무작위 문자열. 로그 한 줄이 어느 요청의 것인지 구분하는 데 쓴다 (교재 7장 481줄).</td></tr>
+<tr><td><code>@interface</code>, <code>@Target</code>, <code>@Retention</code></td><td>애너테이션을 직접 만든다. <code>@Target(ElementType.PARAMETER)</code>는 파라미터에만 붙이게 하고, <code>@Retention(RetentionPolicy.RUNTIME)</code>은 실행 중에도 애너테이션 정보를 읽을 수 있게 남긴다 (교재 7장 684–685줄, <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/annotation/Retention.html">Java 25: Retention</a>).</td></tr>
+<tr><td><code>HandlerMethodArgumentResolver</code></td><td>컨트롤러 파라미터 값을 만드는 객체. <code>supportsParameter</code>가 <code>true</code>인 파라미터에 대해 <code>resolveArgument</code>의 반환값을 넣는다 (교재 7장 731–732줄, <a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/method/support/HandlerMethodArgumentResolver.html">API</a>).</td></tr>
+<tr><td><code>MethodParameter</code></td><td>파라미터 하나의 정보. <code>hasParameterAnnotation(애너테이션.class)</code>는 그 애너테이션이 붙었는지, <code>getParameterType()</code>은 선언한 타입을 돌려준다.</td></tr>
+<tr><td><code>A.class.isAssignableFrom(B)</code></td><td>B 타입의 값을 A 타입 변수에 넣을 수 있으면 <code>true</code> (<a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Class.html#isAssignableFrom(java.lang.Class)">Java 25: Class</a>).</td></tr>
+<tr><td><code>webRequest.getNativeRequest()</code></td><td><code>NativeWebRequest</code>가 감싼 원래 요청 객체. <code>(HttpServletRequest)</code>로 바꿔 세션을 꺼낸다 (교재 7장 721줄).</td></tr>
+</tbody>
+</table>
+<p><code>addArgumentResolvers</code>로 등록한 리졸버는 스프링의 내장 파라미터 처리를 대체하지 않고 거기에 더해진다 (<a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/config/annotation/WebMvcConfigurer.html#addArgumentResolvers(java.util.List)">WebMvcConfigurer API</a>). 표에 나온 어느 경우에도 맞지 않는 객체 타입 파라미터는 <code>@ModelAttribute</code>로 처리된다 (<a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/arguments.html">Spring: Method Arguments</a>, 표 끝의 "Any other argument"). <code>@ModelAttribute</code>는 빈 객체를 새로 만들어 요청 파라미터를 바인딩한다(1회차).</p>
+
+<h3>예시: 과제와 다른 기능(점검 중 안내, 처리 시간 로그, 접속 IP)</h3>
+<pre><code>// 필터: 점검 중이면 /notice 말고는 모두 안내 페이지로 보낸다
+public class MaintenanceFilter implements Filter { // jakarta.servlet
+    private static final String[] allow = {"/notice", "/css/*"};
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response,
+                         FilterChain chain)
+            throws IOException, ServletException {
+        // URI와 리다이렉트를 쓰려고 형변환
+        HttpServletRequest req = (HttpServletRequest) request;
+        HttpServletResponse res = (HttpServletResponse) response;
+        if (!PatternMatchUtils.simpleMatch(allow, req.getRequestURI())) {
+            res.sendRedirect("/notice");  // 응답을 정하고
+            return;                       // 다음 단계로 넘기지 않는다
+        }
+        // 허용 경로만 다음 필터·서블릿으로
+        chain.doFilter(request, response);
+    }
+}
+
+@Configuration
+public class MaintenanceConfig implements WebMvcConfigurer {
+
+    @Bean                         // 돌려준 객체가 빈이 된다
+    public FilterRegistrationBean&lt;Filter&gt; maintenanceFilter() {
+        FilterRegistrationBean&lt;Filter&gt; bean = new FilterRegistrationBean&lt;&gt;();
+        bean.setFilter(new MaintenanceFilter());          // 등록할 필터
+        bean.setOrder(1);                                 // 낮을수록 먼저
+        bean.addUrlPatterns("/*");                        // 모든 요청에 적용
+        return bean;
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(new TimingInterceptor())
+                .order(1)                                 // 인터셉터끼리의 순서
+                .addPathPatterns("/api/**")               // /api 아래 전부
+                .excludePathPatterns("/api/health");      // 이 경로는 뺀다
+    }
+
+    @Override
+    public void addArgumentResolvers(
+            List&lt;HandlerMethodArgumentResolver&gt; resolvers) {
+        resolvers.add(new ClientIpArgumentResolver()); // 직접 만든 리졸버 등록
+    }
+}
+
+// 인터셉터: 요청 처리 시간을 잰다
+@Slf4j                                                    // log 필드가 생긴다
+public class TimingInterceptor implements HandlerInterceptor {
+    @Override
+    public boolean preHandle(HttpServletRequest request,
+                             HttpServletResponse response,
+                             Object handler) {
+        // 요청 하나에만 보관
+        request.setAttribute("start", System.currentTimeMillis());
+        return true;                                      // 계속 진행
+    }
+
+    // @Override: 시그니처가 틀리면 컴파일 오류로 알려 준다
+    @Override
+    public void postHandle(HttpServletRequest request,
+                           HttpServletResponse response,
+                           Object handler, ModelAndView modelAndView) {
+        // 컨트롤러가 정상으로 끝났을 때만 불린다
+        log.info("view={}", modelAndView);
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request,
+                                HttpServletResponse response,
+                                Object handler, Exception ex) {
+        // 예외가 나도 불린다
+        long start = (long) request.getAttribute("start");
+        long took = System.currentTimeMillis() - start;
+        log.info("{} took {}ms", request.getRequestURI(), took);
+    }
+}
+
+// 애너테이션: 파라미터에만, 실행 중에도 읽을 수 있게
+@Target(ElementType.PARAMETER)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface ClientIp {
+}
+
+// 리졸버: @ClientIp String 파라미터에 접속 IP를 넣는다
+public class ClientIpArgumentResolver implements HandlerMethodArgumentResolver {
+    @Override
+    public boolean supportsParameter(MethodParameter parameter) {
+        // @ClientIp가 있고 타입이 String이면 맡는다
+        return parameter.hasParameterAnnotation(ClientIp.class)
+                &amp;&amp; String.class.isAssignableFrom(parameter.getParameterType());
+    }
+
+    @Override
+    public Object resolveArgument(MethodParameter parameter,
+                                  ModelAndViewContainer mavContainer,
+                                  NativeWebRequest webRequest,
+                                  WebDataBinderFactory binderFactory) {
+        HttpServletRequest request =
+                (HttpServletRequest) webRequest.getNativeRequest();
+        return request.getRemoteAddr();   // 이 값이 파라미터에 들어간다
+    }
+}
+
+// 컨트롤러는 파라미터 하나로 받는다
+@GetMapping("/api/me")
+public String me(@ClientIp String ip) { return ip; }</code></pre>
+
+<h2 id="task">6. 과제: <code>shop</code>의 상품 관리에 로그인 체크 걸기</h2>
+<p>Java 코드는 직접 쓴다. 베이스 패키지는 <code>com.study.shop</code>이다. 세 단계로 나눈다. 각 단계를 끝내면 7절의 같은 단계 확인을 하고 다음 단계로 넘어간다.</p>
+
+<h3>시작 전: 새 브랜치</h3>
+<p>2회차 코드는 <code>master</code>에 병합돼 있다. 컨테이너 창 터미널에서 친다.</p>
+<pre><code># 커밋 안 된 변경이 없는지 본다
+git status
+# master에서 3회차 브랜치를 만들고 옮긴다
+git switch master
+git switch -c lesson-03</code></pre>
+
+<h3>A. 필터로 로그인 체크</h3>
+<table class="wrap">
+<thead><tr><th>클래스</th><th>요구 사항</th></tr></thead>
+<tbody>
+<tr><td><code>web.filter.LoginCheckFilter</code></td><td><code>jakarta.servlet.Filter</code> 구현. 화이트리스트 <code>{"/", "/members/add", "/login", "/logout", "/css/*"}</code>를 <code>private static final String[]</code>로 둔다. <code>doFilter</code>: 요청 URI가 화이트리스트에 맞지 않으면(<code>PatternMatchUtils.simpleMatch</code>) <code>getSession(false)</code>로 세션을 찾는다. 세션이 없거나 <code>SessionConst.LOGIN_MEMBER</code> 속성이 없으면 <code>"/login?redirectURL=" + requestURI</code>로 리다이렉트하고 <code>return</code>. 그 밖에는 <code>chain.doFilter(request, response)</code>.</td></tr>
+<tr><td><code>WebConfig</code>(<code>com.study.shop</code> 바로 아래)</td><td><code>@Configuration</code>, <code>implements WebMvcConfigurer</code>. <code>@Bean</code> 메서드 <code>loginCheckFilter()</code>: <code>FilterRegistrationBean&lt;Filter&gt;</code>에 <code>LoginCheckFilter</code>, 순서 <code>1</code>, URL 패턴 <code>"/*"</code>.</td></tr>
+<tr><td><code>web.login.LoginController</code>(수정)</td><td><code>POST /login</code>에 파라미터 <code>@RequestParam(defaultValue = "/") String redirectURL</code>을 더한다. 자리는 <code>BindingResult</code> 뒤 아무 곳이다. 성공하면 <code>"redirect:" + redirectURL</code>을 반환한다. 오류일 때의 처리는 그대로 둔다.</td></tr>
+</tbody>
+</table>
+
+<h3>B. 인터셉터로 바꾸기</h3>
+<table class="wrap">
+<thead><tr><th>클래스</th><th>요구 사항</th></tr></thead>
+<tbody>
+<tr><td><code>web.interceptor.LogInterceptor</code></td><td><code>@Slf4j</code>, <code>HandlerInterceptor</code> 구현. 상수 <code>public static final String LOG_ID = "logId";</code>. <code>preHandle</code>: UUID를 만들어 <code>request.setAttribute(LOG_ID, uuid)</code>, <code>log.info("REQUEST [{}][{}][{}]", uuid, requestURI, handler)</code>, <code>true</code> 반환. <code>postHandle</code>: <code>log.info("postHandle [{}]", modelAndView)</code>. <code>afterCompletion</code>: <code>request.getAttribute(LOG_ID)</code>로 UUID를 꺼내 <code>log.info("RESPONSE [{}][{}]", logId, requestURI)</code>. <code>ex</code>가 <code>null</code>이 아니면 <code>log.error("afterCompletion error!!", ex)</code>. 세 메서드 모두 <code>@Override</code>를 붙인다. 세 메서드가 default라서 이름이나 파라미터를 틀려도 컴파일은 되고 그 메서드만 안 불린다. 시그니처는 5절 예시의 <code>TimingInterceptor</code>와 같다.</td></tr>
+<tr><td><code>web.interceptor.LoginCheckInterceptor</code></td><td><code>@Slf4j</code>, <code>HandlerInterceptor</code> 구현. <code>preHandle</code>만 구현한다. <code>log.info("인증 체크 인터셉터 실행 {}", requestURI)</code>. 세션이 없거나 로그인 회원 속성이 없으면 <code>log.info("미인증 사용자 요청")</code>, <code>"/login?redirectURL=" + requestURI</code>로 리다이렉트, <code>false</code> 반환. 그 밖에는 <code>true</code>.</td></tr>
+<tr><td><code>WebConfig</code>(수정)</td><td><code>addInterceptors</code> 재정의. <code>LogInterceptor</code>: 순서 <code>1</code>, 적용 <code>"/**"</code>, 제외 <code>"/css/**", "/*.ico", "/error"</code>. <code>LoginCheckInterceptor</code>: 순서 <code>2</code>, 적용 <code>"/**"</code>, 제외 <code>"/", "/members/add", "/login", "/logout", "/css/**", "/*.ico", "/error"</code>. 그리고 <code>loginCheckFilter()</code>의 <code>@Bean</code> 한 줄을 주석 처리한다. 필터와 인터셉터가 같은 검사를 두 번 하지 않게 하기 위해서다 (교재 7장 630줄). <code>LoginCheckFilter</code> 클래스는 지우지 않는다.</td></tr>
+</tbody>
+</table>
+
+<h3>C. <code>@Login</code>으로 로그인 회원 받기</h3>
+<table class="wrap">
+<thead><tr><th>클래스</th><th>요구 사항</th></tr></thead>
+<tbody>
+<tr><td><code>web.argumentresolver.Login</code></td><td>애너테이션. <code>@Target(ElementType.PARAMETER)</code>, <code>@Retention(RetentionPolicy.RUNTIME)</code>. 본문은 비어 있다.</td></tr>
+<tr><td><code>web.argumentresolver.LoginMemberArgumentResolver</code></td><td><code>HandlerMethodArgumentResolver</code> 구현. <code>supportsParameter</code>: <code>@Login</code>이 붙었고 타입이 <code>Member</code>이면 <code>true</code>. <code>resolveArgument</code>: <code>getSession(false)</code>로 세션을 찾아, 없으면 <code>null</code>, 있으면 <code>SessionConst.LOGIN_MEMBER</code> 속성을 반환.</td></tr>
+<tr><td><code>WebConfig</code>(수정)</td><td><code>addArgumentResolvers</code> 재정의. <code>resolvers.add(new LoginMemberArgumentResolver())</code>.</td></tr>
+<tr><td><code>web.HomeController</code>(수정)</td><td><code>GET /</code>의 파라미터 <code>@SessionAttribute(name = SessionConst.LOGIN_MEMBER, required = false) Member member</code>를 <code>@Login Member member</code>로 바꾼다. 분기는 그대로: <code>null</code>이면 뷰 <code>home</code>, 아니면 모델 <code>member</code>에 넣고 뷰 <code>loginHome</code>.</td></tr>
+</tbody>
+</table>
+
+<h2 id="check">7. 실행하고 확인하기</h2>
+<p><strong>먼저 확인할 것.</strong> 컨테이너 창에서 <code>./gradlew build</code>가 통과했다. 8081을 쓰는 다른 컨테이너(옛 <code>shop-docker-devcontainer</code>)는 띄우지 않았다. 빌드가 실패하면 출력을 채팅에 붙여 넣는다.</p>
+<p>앱은 컨테이너 창 터미널에서 <code>./gradlew bootRun</code>으로 띄운다. 코드를 바꾼 뒤에는 Ctrl+C로 끄고 다시 띄운다. 앱을 다시 띄우면 세션은 모두 사라지고, <code>TestDataInit</code>이 상품 2개와 회원 <code>test</code> / <code>test!</code>를 다시 넣는다. <code>curl</code>은 컨테이너에 터미널을 하나 더 열어 친다.</p>
+<p>2회차에 쓴 <code>curl</code> 옵션을 다시 적는다 (<a href="https://curl.se/docs/manpage.html">curl 매뉴얼</a>). 새로 쓰는 것은 <code>-o</code>와 <code>-w</code>다.</p>
+<table class="wrap">
+<thead><tr><th>옵션</th><th>뜻</th></tr></thead>
+<tbody>
+<tr><td><code>-s</code></td><td>진행 표시를 숨긴다.</td></tr>
+<tr><td><code>-i</code></td><td>응답 본문 앞에 상태 줄과 응답 헤더도 출력한다.</td></tr>
+<tr><td><code>-d '이름=값&amp;…'</code></td><td>그 값을 폼 데이터로 담아 POST로 보낸다.</td></tr>
+<tr><td><code>-c 파일</code></td><td>응답의 <code>Set-Cookie</code>로 받은 쿠키를 파일에 저장한다.</td></tr>
+<tr><td><code>-b 파일</code> 또는 <code>-b '이름=값'</code></td><td>파일에 저장한 쿠키나 적은 쿠키를 요청에 싣는다.</td></tr>
+<tr><td><code>-o /dev/null</code></td><td>응답 본문을 버린다(새로 씀).</td></tr>
+<tr><td><code>-w '%{http_code}\n'</code></td><td>요청이 끝난 뒤 상태 코드만 출력한다(새로 씀).</td></tr>
+</tbody>
+</table>
+<pre><code># 예시(과제와 다른 주소): 본문은 버리고 상태 코드만 본다
+curl -s -o /dev/null -w '%{http_code}\n' http://example.com/</code></pre>
+<p><code>| grep -iE '패턴'</code>은 출력에서 패턴이 든 줄만 남긴다(<code>-i</code> 대소문자 무시, <code>-E</code> <code>|</code>로 "또는"). 줄 끝의 <code>\</code>는 명령이 다음 줄로 이어진다는 표시다. 주소에 <code>?</code>가 있으면 작은따옴표로 감싼다.</p>
+
+<h3>A 단계 확인(필터)</h3>
+<ol class="steps">
+<li>
+<p>로그인 없이 상품 목록을 요청해 1절 흐름의 ①~④를 확인한다. 상태 코드, <code>Location</code>, <code>Set-Cookie</code> 유무를 본다.</p>
+<pre><code>curl -s -i http://localhost:8081/items \
+  | grep -iE '^HTTP|^location|^set-cookie'</code></pre>
+</li>
+<li>
+<div class="predict">로그인 없이 CSS 파일을 요청한다. 상태 코드는 200일까, 302일까?</div>
+<pre><code>curl -s -o /dev/null -w '%{http_code}\n' \
+  http://localhost:8081/css/bootstrap.min.css</code></pre>
+</li>
+<li>
+<div class="predict">아무 값의 <code>JSESSIONID</code>를 싣고 상품 목록을 요청한다. ① 상태 코드는? ② 응답에 <code>Set-Cookie</code>가 붙을까? 서버의 세션 저장소와 브라우저 쪽 쿠키를 나눠서 답한다.</div>
+<pre><code>curl -s -i -b 'JSESSIONID=AAAA1111' http://localhost:8081/items \
+  | grep -iE '^HTTP|^location|^set-cookie'</code></pre>
+</li>
+<li>
+<div class="predict"><code>redirectURL=/items</code>를 붙여 로그인한다. 응답의 <code>Location</code>은 어디일까?</div>
+<pre><code>curl -s -i -c /tmp/shop-cookie.txt \
+  -d 'loginId=test&amp;password=test!' \
+  'http://localhost:8081/login?redirectURL=/items' \
+  | grep -iE '^HTTP|^location|^set-cookie'</code></pre>
+<p>받은 쿠키를 싣고 상품 목록을 연다. <code>상품 목록</code>이 보이면 통과다.</p>
+<pre><code>curl -s -b /tmp/shop-cookie.txt http://localhost:8081/items | grep '상품 목록'</code></pre>
+<p>브라우저로도 한다. 통합 브라우저(명령 팔레트 "Browser: Open Integrated Browser")에서 로그아웃 상태로 <code>http://localhost:8081/items</code>를 연다. 주소창이 <code>/login?redirectURL=/items</code>가 되는지 보고, <code>test</code> / <code>test!</code>로 로그인한 뒤 상품 목록으로 돌아오는지 본다. 결과를 보기 전에 Ctrl+Shift+R로 캐시 없이 새로고침한다.</p>
+</li>
+<li>
+<div class="predict">(실험) <code>LoginCheckFilter</code>의 <code>getSession(false)</code>를 잠시 <code>getSession()</code>으로 바꾸고 앱을 다시 띄운다. 쿠키 없이 1번 명령을 다시 치면 ① <code>Set-Cookie</code> 줄이 생길까? ② 로그인하지 않은 방문자 1,000명이 상품 주소를 한 번씩 열면 서버 메모리에는 무엇이 쌓일까?</div>
+<p>확인이 끝나면 <code>getSession(false)</code>로 되돌리고 앱을 다시 띄운다.</p>
+</li>
+</ol>
+
+<h3>B 단계 확인(인터셉터)</h3>
+<p>로그는 <code>bootRun</code>을 띄운 터미널에 나온다. 한 줄은 대략 <code>… INFO … c.s.s.web.interceptor.LogInterceptor : REQUEST [uuid][/items][…]</code> 모양이다. 줄 앞부분 형식은 환경마다 다를 수 있다.</p>
+<ol class="steps">
+<li>
+<p>A 단계의 1번과 4번 명령을 다시 쳐서 결과가 필터 때와 같은지 본다.</p>
+</li>
+<li>
+<div class="predict">로그아웃 상태에서 <code>GET /items</code>를 보낸다(A-1 명령). 앱 터미널에 <code>REQUEST</code>, <code>인증 체크 인터셉터 실행</code>, <code>미인증 사용자 요청</code>, <code>postHandle</code>, <code>RESPONSE</code> 가운데 어떤 줄이 어떤 순서로 찍힐까? 이어서 브라우저가 따라가는 <code>/login</code> 요청은 curl이 따라가지 않으니 여기서는 보지 않는다.</div>
+</li>
+<li>
+<p class="muted">B-1에서 앱을 다시 띄웠다면 세션이 사라졌으니 A-4의 로그인 명령부터 다시 친다.</p>
+<div class="predict">로그인한 쿠키로 <code>GET /items</code>를 보낸다(A-4의 두 번째 명령). 이번에는 어떤 줄이 어떤 순서로 찍힐까?</div>
+</li>
+</ol>
+
+<h3>C 단계 확인(<code>@Login</code>)</h3>
+<ol class="steps">
+<li>
+<p>로그인한 쿠키로 홈을 연다. <code>로그인: 테스터</code>가 보이면 통과다. 쿠키 없이 열면 <code>회원 가입</code>이 보여야 한다.</p>
+<pre><code># 로그인한 쿠키를 싣고
+curl -s -b /tmp/shop-cookie.txt http://localhost:8081/ \
+  | grep -E '로그인:|회원 가입'
+# 쿠키 없이
+curl -s http://localhost:8081/ | grep -E '로그인:|회원 가입'</code></pre>
+<p class="muted">앱을 다시 띄웠다면 세션이 사라졌으니 A-4의 로그인 명령부터 다시 친다.</p>
+</li>
+<li>
+<div class="predict">(실험) <code>HomeController</code>의 파라미터에서 <code>@Login</code>만 지우고(<code>Member member</code>만 남김) 앱을 다시 띄운다. 쿠키 없이 홈을 열면 어느 화면일까? <code>로그인:</code> 뒤에는 무엇이 찍힐까?</div>
+<pre><code>curl -s http://localhost:8081/ | grep -E '로그인:|회원 가입'</code></pre>
+<p>확인이 끝나면 <code>@Login</code>을 되돌린다.</p>
+</li>
+</ol>
+<p>예측과 다르게 나온 것이 있으면 출력을 그대로 채팅에 붙여 넣는다. 끝나면 "다 했어"라고 알려 주면 채점한다.</p>
+
+<h2 id="source">1차 자료</h2>
+<ul>
+<li>교재 「스프링 MVC 2편」 <code>courses/spring-mvc2/docs/07. 로그인 처리2 - 필터, 인터셉터.md</code>: 14–75줄(공통 관심사, 필터 소개), 193–334줄(인증 체크 필터, <code>redirectURL</code>), 336–421줄(인터셉터 소개와 호출 흐름), 423–560줄(로그 인터셉터, 경로 패턴), 562–638줄(인증 체크 인터셉터), 640–767줄(<code>ArgumentResolver</code>). 77–192줄의 로그 필터는 오늘 만들지 않는다.</li>
+<li><a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/HandlerInterceptor.html">Spring Framework: HandlerInterceptor</a></li>
+<li><a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-config/interceptors.html">Spring Framework: Interceptors 설정</a></li>
+<li><a href="https://jakarta.ee/specifications/servlet/6.1/apidocs/jakarta.servlet/jakarta/servlet/Filter.html">Jakarta Servlet 6.1: Filter</a></li>
+</ul>
+<p class="note">막히거나 이해가 안 되는 곳은 언제든 채팅으로 물어보자. 레슨에 없는 것도 괜찮다.</p>
+
+<nav class="lesson-nav">
+<a href="0002-member-session-login.html">2회차 레슨</a>
+<a href="../reference/glossary.html">용어집</a>
+</nav>
+</main>
+</body>
+</html>

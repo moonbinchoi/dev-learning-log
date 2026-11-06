@@ -1,0 +1,21 @@
+...@lesson-theme
+direction: down
+
+s1: "① GET /items\n쿠키 없음" {class: [input; S1]}
+s2: "② DispatcherServlet\n핸들러를 찾고 preHandle 호출" {class: [step; S2]}
+s3: "③ LoginCheckInterceptor\ngetSession(false) → null" {class: [step; S3]}
+s4: "④ 리다이렉트 응답\nLocation: /login?redirectURL=/items" {class: [done; S4]}
+s5: "⑤ GET /login?redirectURL=/items\n제외 경로 → 로그인 폼" {class: [input; S5]}
+s6: "⑥ POST /login?redirectURL=/items\n세션 생성, redirect:/items" {class: [step; S6]}
+s7: "⑦ GET /items + Cookie\n통과 → ItemController" {class: [done; S7]}
+
+store: "세션 저장소(톰캣 메모리)\nABC… → 회원 test" {class: data}
+
+s1 -> s2: {class: flow}
+s2 -> s3: {class: flow}
+s3 -> s4: "false" {class: flow}
+s4 -> s5: {class: flow}
+s5 -> s6: {class: flow}
+s6 -> s7: "Set-Cookie: JSESSIONID=ABC…" {class: flow}
+s6 -> store: {class: save}
+s7 -> store: {class: flow}
