@@ -21,14 +21,17 @@ MODES = {
 }
 
 
+def absolutize(html, lesson_dir):
+    # 잘라 낸 파일은 out_dir에 놓이므로 stylesheet·이미지의 상대 경로를 절대 file URL로 바꾼다
+    assets = (pathlib.Path(lesson_dir) / "../assets").resolve().as_uri()
+    return html.replace('"../assets/', f'"{assets}/')
+
+
 def main(lesson, out, *only):
     sys.stdout.reconfigure(encoding="utf-8")
     lesson, out = pathlib.Path(lesson).resolve(), pathlib.Path(out).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    html = lesson.read_text(encoding="utf-8")
-    # 상대 경로 stylesheet를 절대 file URL로 바꿔 잘라 낸 파일에서도 스타일이 먹게 한다
-    css = (lesson.parent / "../assets/style.css").resolve().as_uri()
-    html = html.replace('href="../assets/style.css"', f'href="{css}"')
+    html = absolutize(lesson.read_text(encoding="utf-8"), lesson.parent)
     head, rest = html.split("<main>", 1)
     body, tail = rest.split("</main>", 1)
     sections = re.split(r"(?=<h[23][ >])", body)

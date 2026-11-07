@@ -1,0 +1,131 @@
+<!doctype html>
+<!-- 레슨 뼈대. 준비 세션은 이전 레슨 대신 이 파일로 형식을 본다.
+     절 구성과 클래스 이름만 따르고, 절 안의 내용과 개수는 회차에 맞춘다.
+     규칙: docs/learning/operating-rules.md "레슨 설계", 검토: docs/learning/lesson-review.md
+     pre 안의 코드는 한 줄 72칸 이하로 쓴다. 넘으면 인자나 체인 호출에서 줄을 바꾼다. -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>회차 주제</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>N회차 · 회차 주제</h1>
+<p class="subtitle">강좌 N장 · Spring Boot 버전 · 용어는 <a href="../reference/glossary.html">용어집</a></p>
+
+<p><strong>오늘의 결과물.</strong> 회차가 끝나면 학습자의 프로젝트에서 무엇이 되는지.</p>
+<p class="muted">앞 회차에서 끝난 상태와 이번 회차가 메우는 빈틈(교재 N장 줄). 면접 질문 한 줄.</p>
+
+<h2 id="flow">1. 동작 원리: 요청 1건</h2>
+<p>흐름 요약 한 문단.</p>
+<table class="wrap">
+<thead><tr><th>등장 객체</th><th>역할</th></tr></thead>
+<tbody>
+<tr><td><code>객체</code></td><td>역할. 검사·분기하는 객체는 <strong>검사하고 분기한다.</strong>로 표시한다.</td></tr>
+</tbody>
+</table>
+
+<!-- stepper: 라디오 name은 레슨마다 고유하게, value와 tr의 data-step을 맞춘다.
+     그림은 assets/diagrams/<이름>.d2를 render-diagram.py로 넣는다(폭 720 이하).
+     d2 상자 class: input(요청) · step(서버 처리) · done(응답·화면) · data(남는 데이터) -->
+<div class="stepper">
+<fieldset class="step-tabs" aria-label="흐름 단계">
+<label><input type="radio" name="flow" value="1" checked>①</label>
+<label><input type="radio" name="flow" value="2">②</label>
+</fieldset>
+<figure>
+<!-- d2:flow -->
+<!-- /d2 -->
+<figcaption>단계 번호를 누르면 그 상자와 아래 표의 줄이 함께 강조된다.</figcaption>
+</figure>
+<ul class="legend">
+<li class="input">브라우저가 보낸 요청</li>
+<li class="step">서버 처리</li>
+<li class="done">응답·화면</li>
+<li class="data">서버에 남는 데이터</li>
+</ul>
+<table class="wrap">
+<thead><tr><th>단계</th><th>누가, 무엇을</th><th>상태 칸</th></tr></thead>
+<tbody>
+<tr data-step="1"><td>① 이름</td><td>누가 무엇을 하는지.</td><td>값</td></tr>
+<tr data-step="2"><td>② 이름</td><td>누가 무엇을 하는지.</td><td>값</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="concept">2. 개념 절</h2>
+<!-- 교재 그림: assets/images/에 복사하고 캡션 끝에 출처를 쓴다 -->
+<figure>
+<img src="../assets/images/이름.png" alt="그림이 보여 주는 내용">
+<figcaption>그림 설명. 출처: 김영한 「강좌명」 N장 줄 그림.</figcaption>
+</figure>
+
+<h2 id="summary">3. 핵심 요약</h2>
+<table class="wrap">
+<thead><tr><th>코드·설정</th><th>동작</th></tr></thead>
+<tbody>
+<tr><td><code>코드</code></td><td>동작 (교재 N장 줄 또는 공식 문서 링크).</td></tr>
+</tbody>
+</table>
+
+<h2 id="boot4">4. Boot 버전 차이</h2>
+<ul>
+<li>교재 코드와 달라지는 점 (<a href="https://docs.spring.io/">공식 문서</a>).</li>
+</ul>
+
+<h2 id="api">5. 오늘 쓰는 API</h2>
+<table class="wrap">
+<thead><tr><th>이름</th><th>한 줄 설명</th></tr></thead>
+<tbody>
+<tr><td><code>이름</code></td><td>설명 (출처).</td></tr>
+</tbody>
+</table>
+<h3>예시: 과제와 다른 기능</h3>
+<pre><code>// 줄마다 뜻을 주석으로
+코드</code></pre>
+
+<h2 id="task">6. 과제: 과제 이름</h2>
+<p>베이스 패키지, 단계 수, 단계마다 7절 확인을 한다는 안내.</p>
+<h3>시작 전: 새 브랜치</h3>
+<pre><code># 커밋 안 된 변경이 없는지 본다
+git status
+git switch -c lesson-NN</code></pre>
+<h3>A. 단계 이름</h3>
+<table class="wrap">
+<thead><tr><th>클래스</th><th>요구 사항</th></tr></thead>
+<tbody>
+<tr><td><code>패키지.클래스</code></td><td>써야 할 이름·값·요구 사항을 모두 적는다.</td></tr>
+</tbody>
+</table>
+
+<h2 id="check">7. 실행하고 확인하기</h2>
+<p><strong>먼저 확인할 것.</strong> 빌드 통과, 포트 충돌 없음.</p>
+<h3>A 단계 확인</h3>
+<ol class="steps">
+<li>
+<p>확인만 하는 단계.</p>
+<pre><code>명령</code></pre>
+</li>
+<li>
+<div class="predict">결과를 묻는 예측 질문. 답을 드러내지 않는다.</div>
+<pre><code>명령</code></pre>
+</li>
+</ol>
+<p>예측과 다르게 나온 것이 있으면 출력을 그대로 채팅에 붙여 넣는다. 끝나면 "다 했어"라고 알려 주면 채점한다.</p>
+
+<h2 id="source">1차 자료</h2>
+<ul>
+<li>교재 「강좌명」 <code>courses/&lt;course&gt;/docs/&lt;장&gt;.md</code>: 줄 범위(내용).</li>
+<li><a href="https://docs.spring.io/">공식 문서 제목</a></li>
+</ul>
+<p class="note">막히거나 이해가 안 되는 곳은 언제든 채팅으로 물어보자. 레슨에 없는 것도 괜찮다.</p>
+
+<nav class="lesson-nav">
+<a href="NNNN-이전-레슨.html">N-1회차 레슨</a>
+<a href="../reference/glossary.html">용어집</a>
+</nav>
+</main>
+</body>
+</html>
