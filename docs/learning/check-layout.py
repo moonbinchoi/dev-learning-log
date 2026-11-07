@@ -47,15 +47,21 @@ addEventListener('load', () => {
     const right = el.getBoundingClientRect().right, pr = el.parentElement.getBoundingClientRect().right;
     if (right > pr + 1) out.push(where(el) + ' | overflow | ' + name(el) + ' | ' + Math.round(right) + ' > ' + Math.round(pr) + 'px');
   }
-  // 키 칸·헤더의 코드는 끊기면 안 된다. 다른 칸은 한 줄로 칸에 들어가는데도 끊겼을 때만 잡는다
+  // 표 칸 안 코드는 공백으로 나눈 토큰(식별자) 하나가 줄 둘 이상(top이 다른 rect)으로 끊기면 잡는다. 공백에서만 줄이 바뀌는 건 허용한다. 키 칸(th, td:first-child)은 칩이 아예 줄바꿈되면 안 된다
   for (const el of document.querySelectorAll('td code, th code')) {
-    const rects = [...el.getClientRects()];
-    if (rects.length < 2) continue;
-    const cell = el.closest('td, th'), cs = getComputedStyle(cell);
-    const room = cell.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-    const width = rects.reduce((s, r) => s + r.width, 0);
-    if (cell.matches('th, td:first-child') || width <= room)
-      out.push(where(el) + ' | code-break | ' + name(el) + ' | ' + Math.round(width) + '/' + Math.round(room) + 'px');
+    const rects = [...el.getClientRects()], tops = rs => new Set([...rs].map(r => Math.round(r.top))).size;
+    let broken = false;
+    if (el.closest('th, td:first-child')) broken = rects.length > 1;
+    else {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let n; !broken && (n = walker.nextNode());)
+        for (const m of n.nodeValue.matchAll(/\\S+/g)) {
+          const range = document.createRange();
+          range.setStart(n, m.index); range.setEnd(n, m.index + m[0].length);
+          if (tops(range.getClientRects()) > 1) { broken = true; break; }
+        }
+    }
+    if (broken) out.push(where(el) + ' | code-break | ' + name(el) + ' | ' + Math.round(rects.reduce((s, r) => s + r.width, 0)) + 'px');
   }
   // 글자를 직접 가진 보이는 요소와 SVG text
   const texts = [...document.querySelectorAll('body *')].filter(el => {
@@ -147,9 +153,11 @@ def main(lesson):
     sys.stdout.reconfigure(encoding="utf-8")
     lesson = pathlib.Path(lesson).resolve()
     page = lesson.read_text(encoding="utf-8")
-    # 사본은 다른 폴더에 쓰므로 상대 경로 stylesheet를 절대 file URL로 바꾼다
-    css = (lesson.parent / "../assets/style.css").resolve().as_uri()
-    page = page.replace('href="../assets/style.css"', f'href="{css}"')
+    # 사본은 다른 폴더에 쓰므로 <base>로 상대 경로(stylesheet·이미지)를 원래 폴더 기준으로 푼다
+    base = f'<base href="{lesson.parent.as_uri()}/">'
+    # <header>와 헷갈리지 않게 <head> 또는 <head 속성...>만 맞춘다. 없으면 문서 맨 앞
+    page, n = re.subn(r"<head(?:\s[^>]*)?>", lambda m: m.group(0) + base, page, count=1, flags=re.I)
+    page = page if n else base + page
     lines = []
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         for mode, (flags, overflow) in MODES.items():

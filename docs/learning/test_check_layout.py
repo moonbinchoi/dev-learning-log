@@ -1,14 +1,16 @@
 """check-layout.py의 검사를 픽스처 HTML로 확인한다. 사용: python docs/learning/test_check_layout.py"""
 import pathlib
+import struct
 import subprocess
 import sys
 import tempfile
+import zlib
 
 HERE = pathlib.Path(__file__).parent
 LONG = "word " * 300
 WRAP = "very long link text " * 8
 FIXTURE = f"""<!doctype html><html><head><meta charset="utf-8"><title>t</title><style>
-body{{background:#fff;color:#111}}a{{color:inherit}}
+body{{background:#fff;color:#111}}a{{color:inherit}}code{{overflow-wrap:anywhere}}
 @media (prefers-color-scheme: dark){{body{{background:#121212;color:#eee}}.dk{{color:#555}}}}
 </style></head><body>
 <h2>overlap-case</h2>
@@ -43,6 +45,14 @@ body{{background:#fff;color:#111}}a{{color:inherit}}
 <p><a href="#">{WRAP}</a> <code>x</code></p>
 <h2>control-table</h2>
 <table style="border-collapse:collapse"><tr><td style="border:1px solid #111">a</td><td style="border:1px solid #111">b</td></tr><tr><td style="border:1px solid #111">c</td><td style="border:1px solid #111">d</td></tr></table>
+<h2>code-break-case</h2>
+<table style="border-collapse:collapse;width:300px"><tr><td style="border:1px solid #111">k</td><td style="border:1px solid #111"><code>org.springframework.web.servlet.config.annotation.WebMvcConfigurer</code></td></tr></table>
+<h2>control-code-space</h2>
+<table style="border-collapse:collapse;width:300px"><tr><td style="border:1px solid #111">k</td><td style="border:1px solid #111"><code>{WRAP}</code></td></tr></table>
+<h2>code-break-space-case</h2>
+<table style="border-collapse:collapse;width:300px"><tr><td style="border:1px solid #111">k</td><td style="border:1px solid #111"><code>org.springframework.web.servlet.HandlerInterceptor x</code></td></tr></table>
+<h2>relative-img-case</h2>
+<div style="width:400px"><img src="../assets/images/wide.png"></div>
 <h2>bottom-case</h2>
 <div style="height:3000px"></div>
 <p style="color:#808080">bottom</p>
@@ -56,6 +66,9 @@ EXPECT = [
     (BOTH, "clip-case", "clip-y", ""),
     (BOTH, "p-overflow-case", "overflow", ""),
     (BOTH, "svg-overflow-case", "overflow", ""),
+    (BOTH, "code-break-case", "code-break", ""),
+    (BOTH, "code-break-space-case", "code-break", ""),
+    (BOTH, "relative-img-case", "overflow", ""),
     (LIGHT, "light-contrast-case", "contrast", "4.48:1 < 4.5:1"),
     (DARK, "dark-contrast-case", "contrast", "2.51:1 < 4.5:1"),
     (DARK, "svg-rect-case", "contrast", "1.61:1"),
@@ -66,12 +79,25 @@ EXPECT = [
 ]
 # (모드, 절): 이 절의 줄이 있으면 안 된다
 FORBID = [(BOTH, "control-pass"), (BOTH, "control-large"), (BOTH, "control-bold"), (DARK, "control-pre"),
-          (BOTH, "control-wrap"), (BOTH, "control-table")]
+          (BOTH, "control-wrap"), (BOTH, "control-table"),
+          (BOTH, "control-code-space")]
+
+
+def wide_png(w=1200, h=10):
+    """w x h 단색 PNG 바이트."""
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d))
+    raw = (b"\x00" + b"\x80\x80\x80" * w) * h
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
 
 
 def main():
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
-        page = pathlib.Path(tmp) / "fixture.html"
+        (pathlib.Path(tmp) / "assets/images").mkdir(parents=True)
+        (pathlib.Path(tmp) / "assets/images/wide.png").write_bytes(wide_png())
+        (pathlib.Path(tmp) / "lesson").mkdir()
+        page = pathlib.Path(tmp) / "lesson/fixture.html"
         page.write_text(FIXTURE, encoding="utf-8")
         out = subprocess.run([sys.executable, str(HERE / "check-layout.py"), str(page)],
                              capture_output=True, encoding="utf-8", timeout=180)

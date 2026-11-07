@@ -1,5 +1,6 @@
 // Practice guard for docs/learning/operating-rules.md: practice code under projects/ is graded by reviewer with grading.md, even one file.
 // Denies the main session's reads of projects/; subagents pass. Hook event: PreToolUse.
+const fs = require('fs');
 const path = require('path');
 
 const PRACTICE = path.resolve(__dirname, '..', '..', 'projects').toLowerCase();
@@ -9,6 +10,17 @@ const SHELL_OK = /^\s*(git|docker)\b/i; // diff for the review talk, status read
 const inPractice = (p, cwd) => {
   const abs = path.resolve(cwd || process.cwd(), String(p)).toLowerCase();
   return abs === PRACTICE || abs.startsWith(PRACTICE + path.sep);
+};
+// A shell token counts when it resolves to something that exists under projects/; a glob counts when a match does.
+// With a recursive flag, an existing directory that contains projects/ (or is it) counts too.
+const isPracticePath = (tok, cwd, recursive) => {
+  const abs = path.resolve(cwd, tok);
+  if (/[*?[]/.test(tok)) {
+    try { return fs.globSync(tok, { cwd }).some((m) => inPractice(m, cwd)); } catch (e) { return false; }
+  }
+  if (!fs.existsSync(abs)) return false;
+  const low = abs.toLowerCase();
+  return inPractice(tok, cwd) || (recursive && fs.statSync(abs).isDirectory() && (PRACTICE + path.sep).startsWith(low.replace(/[\/]$/, '') + path.sep));
 };
 // Git Bash writes E:\x as /e/x.
 const fromGitBash = (t) => t.replace(/^\/([a-z])\//i, '$1:/');
@@ -21,13 +33,19 @@ function run(input) {
   else if (input.tool_name === 'Grep') hit = !!t.path && inPractice(t.path, input.cwd);
   else if (input.tool_name === 'Bash' || input.tool_name === 'PowerShell') {
     const c = String(t.command || '');
-    // ponytail: naive split, a separator inside quotes also splits; parse quotes if that causes false denies.
-    hit = c.split(/;|&&|\|\|?/).some(
-      (s) =>
-        SHELL_READ.test(s) &&
-        !SHELL_OK.test(s) &&
-        s.split(/[\s"'=<>(),]+/).some((tok) => tok && inPractice(fromGitBash(tok), input.cwd))
-    );
+    // shortcut: naive split, a separator inside quotes also splits; parse quotes if that causes false denies.
+    // shortcut: tokens are judged regardless of role, so a pattern word that names an existing practice path denies from any cwd (grep -rn projects docs/learning from root);
+    // only commands in SHELL_READ are checked (nl, cp, node -e, done < file pass); pushd, cd -, $(...) and variables are not followed; a cd after a failed && still moves cwd.
+    // A cd before a lone & runs in the background, so it does not move cwd. These are inherent to not parsing the shell; add a real parser only if they cause real misses.
+    let cwd = input.cwd || process.cwd();
+    const parts = c.split(/(\r?\n|;|&&|&|\|\|?)/); // pieces at even indexes, the separator that ends each at odd ones
+    for (let i = 0; i < parts.length; i += 2) {
+      const s = parts[i];
+      const rec = /(^|\s)(-[a-z]*[rR][a-z]*|--recursive)(\s|$)/.test(s);
+      if (SHELL_READ.test(s) && !SHELL_OK.test(s) && s.split(/[\s"'=<>(),]+/).filter(Boolean).some((tok) => isPracticePath(fromGitBash(tok), cwd, rec))) hit = true;
+      const cd = s.match(/^\s*(?:cd|set-location)\s+["']?([^\s"']+)/i);
+      if (cd && parts[i + 1] !== '&') cwd = path.resolve(cwd, fromGitBash(cd[1]));
+    }
   }
   if (!hit) return null;
   return {

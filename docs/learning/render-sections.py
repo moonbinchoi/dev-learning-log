@@ -19,19 +19,26 @@ MODES = {
     "dark": ["--window-size=500,2400", "--force-dark-mode",
              "--blink-settings=preferredColorScheme=0"],
 }
+# 절 높이를 이미지가 로드된 뒤 DOM에 적어 둔다(--dump-dom으로 읽는다). 본문 안(</main> 바로 뒤)에 넣는다
+MEASURE = ("<script>addEventListener('load', () => "
+           "document.documentElement.dataset.h = document.documentElement.scrollHeight)</script>")
+# 이 Chrome에서 80000px 창도 그대로 찍혔다(2017년 16384 보고는 해당 없음). 그 이상은 검증하지 않았다
+MAX_HEIGHT = 80000
 
 
-def absolutize(html, lesson_dir):
-    # 잘라 낸 파일은 out_dir에 놓이므로 stylesheet·이미지의 상대 경로를 절대 file URL로 바꾼다
-    assets = (pathlib.Path(lesson_dir) / "../assets").resolve().as_uri()
-    return html.replace('"../assets/', f'"{assets}/')
+def add_base(html, lesson_dir):
+    # 잘라 낸 파일은 out_dir에 놓이므로 <base>로 stylesheet·이미지의 상대 경로를 레슨 폴더 기준으로 푼다
+    # check-layout.py와 같은 규칙: 첫 <head ...> 바로 뒤, 없으면 문서 맨 앞
+    base = f'<base href="{pathlib.Path(lesson_dir).as_uri()}/">'
+    html, n = re.subn(r"<head(?:\s[^>]*)?>", lambda m: m.group(0) + base, html, count=1, flags=re.I)
+    return html if n else base + html
 
 
 def main(lesson, out, *only):
     sys.stdout.reconfigure(encoding="utf-8")
     lesson, out = pathlib.Path(lesson).resolve(), pathlib.Path(out).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    html = absolutize(lesson.read_text(encoding="utf-8"), lesson.parent)
+    html = add_base(lesson.read_text(encoding="utf-8"), lesson.parent)
     head, rest = html.split("<main>", 1)
     body, tail = rest.split("</main>", 1)
     sections = re.split(r"(?=<h[23][ >])", body)
@@ -43,7 +50,7 @@ def main(lesson, out, *only):
             jobs.append((i, title, None))
             continue
         page = out / f"{i:02d}.html"
-        page.write_text(head + "<main>" + sec + "</main>" + tail, encoding="utf-8")
+        page.write_text(head + "<main>" + sec + "</main>" + MEASURE + tail, encoding="utf-8")
         jobs.append((i, title, page))
 
     def shoot(i, page, mode):
@@ -52,13 +59,26 @@ def main(lesson, out, *only):
         profile = out / f"profile-{i:02d}-{mode}"
         png.unlink(missing_ok=True)
         try:
+            # --screenshot은 창만큼만 찍으므로 먼저 --dump-dom으로 절 높이를 재서 창을 늘린다
+            size = MODES[mode][0]
+            dom = subprocess.run([CHROME, "--headless=new", "--disable-gpu",
+                                  f"--user-data-dir={profile}", size, "--dump-dom", page.as_uri()],
+                                 capture_output=True, timeout=60).stdout.decode("utf-8", "replace")
+            m = re.search(r'data-h="(\d+)"', dom)
+            width, height = map(int, size.split("=")[1].split(","))
+            warn = None
+            if not m:
+                warn = "높이를 재지 못해 기본 창 크기로 찍음"
+            elif int(m.group(1)) > MAX_HEIGHT:
+                warn = f"높이 {m.group(1)}px가 한계 {MAX_HEIGHT}px를 넘어 잘릴 수 있음"
+            window = f"--window-size={width},{min(MAX_HEIGHT, max(height, int(m.group(1)))) if m else height}"
             subprocess.run([CHROME, "--headless=new", "--disable-gpu",
-                            f"--user-data-dir={profile}", *MODES[mode],
+                            f"--user-data-dir={profile}", window, *MODES[mode][1:],
                             f"--screenshot={png}", page.as_uri()],
                            capture_output=True, timeout=60)
         except subprocess.TimeoutExpired:
-            return False
-        return png.exists()
+            return False, None
+        return png.exists(), warn
 
     with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 4)) as pool:
         futures = [(i, title, {m: pool.submit(shoot, i, page, m) for m in MODES})
@@ -67,8 +87,12 @@ def main(lesson, out, *only):
             if fs is None:
                 print(f"{i:02d} {title} (건너뜀)")
                 continue
-            missing = [m for m, f in fs.items() if not f.result()]
+            res = {m: f.result() for m, f in fs.items()}
+            missing = [m for m, r in res.items() if not r[0]]
             print(f"{i:02d} {title}" + (f" MISSING {missing}" if missing else ""))
+            for m, r in res.items():
+                if r[1]:
+                    print(f"WARN {i:02d} {m}: {r[1]}")
 
 
 if __name__ == "__main__":
