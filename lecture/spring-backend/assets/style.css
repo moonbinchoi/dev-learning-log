@@ -52,6 +52,8 @@ td:first-child { white-space: nowrap; }
 table.wrap td:first-child { white-space: normal; }
 /* 키 이름 칸과 헤더의 코드는 한 덩어리로 둔다 */
 table.wrap td:first-child code, th code { white-space: nowrap; overflow-wrap: normal; }
+/* 표 칸의 코드 칩은 통째로 다음 줄로 넘어간다. 칸보다 긴 칩만 안에서 줄을 바꾼다 */
+td code { display: inline-block; max-width: 100%; }
 @media (max-width: 640px) {
   table.wrap th { display: none; }
   table.wrap tr { display: block; padding: 6px 0; border-bottom: 1px solid var(--rule); }
