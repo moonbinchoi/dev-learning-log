@@ -8,6 +8,7 @@
 - overflow: 1000px의 pre·td·th·p·li·figure, 500px의 td·th·p·li·figure에서 내용이 칸을 넘친다 (500px pre의 가로 스크롤은 허용). img·svg는 부모의 오른쪽 끝을 넘는지로 잰다
 - code-break: 표 칸 안 코드가 두 줄 이상으로 끊긴다
 - overlap: 글자를 가진 두 요소(서로 포함 관계 아님)의 영역이 가로·세로 모두 1px를 넘게 겹친다
+- figure-tall: figure 안 img·svg의 높이가 700px를 넘는다 (한 화면에 들어와야 한다)
 - clip-y: overflow-y가 visible이 아닌 요소의 내용이 세로로 잘린다
 - contrast: 글자색과 글자 밑 배경색의 WCAG 대비가 기준(4.5:1, 큰 글자 3:1)에 못 미친다. ::before·::after의 문자열 content도 잰다. 같은 색 조합은 한 줄로 묶고 요소 칸 끝에 ` 외 N개`를 붙인다
 
@@ -46,6 +47,11 @@ addEventListener('load', () => {
   for (const el of document.querySelectorAll('img, svg')) {
     const right = el.getBoundingClientRect().right, pr = el.parentElement.getBoundingClientRect().right;
     if (right > pr + 1) out.push(where(el) + ' | overflow | ' + name(el) + ' | ' + Math.round(right) + ' > ' + Math.round(pr) + 'px');
+  }
+  // figure 안 그림은 높이 700px 이하여야 한 화면에 들어온다. 중첩 svg는 바깥 svg만 잰다
+  for (const el of document.querySelectorAll('figure img, figure svg')) {
+    const h = el.getBoundingClientRect().height;
+    if (!el.parentElement.closest('svg') && h > 700) out.push(where(el) + ' | figure-tall | ' + name(el) + ' | ' + Math.round(h) + ' > 700px');
   }
   // 표 칸 안 코드는 공백으로 나눈 토큰(식별자) 하나가 줄 둘 이상(top이 다른 rect)으로 끊기면 잡는다. 공백에서만 줄이 바뀌는 건 허용한다. 키 칸(th, td:first-child)은 칩이 아예 줄바꿈되면 안 된다
   for (const el of document.querySelectorAll('td code, th code')) {

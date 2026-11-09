@@ -24,7 +24,7 @@
 7. **용어**: 용어집과 같은 말을 쓴다. 새 용어가 용어집에 있다.
 8. **범위**: MISSION의 Out of scope를 넘지 않고, 1회차 시간 안에 끝난다.
 9. **동작 원리**: 회차의 핵심 개념마다 실습 앞에 역할표와 요청 1건의 번호 붙은 흐름(5~7단계)이 있다. 흐름에서 누가 검사하고 누가 분기하는지, 언제 어떤 값이 어디에 있는지 드러나고, 학습자가 추론해야 할 단계가 없다.
-10. **그림**: 교재나 공식 자료에 맞는 그림이 있으면 그것을 넣었다. 링크만 두지 않고 페이지에 바로 보이며, 그림 아래에 출처가 있다. 직접 그린 그림은 트랙 `assets/diagrams/`의 `.d2` 소스를 `render-diagram.py`로 넣은 것이고 폭이 720 이하다. 요청 흐름 그림은 `.stepper`로 단계마다 상자와 표 줄이 함께 강조된다.
+10. **그림**: 교재나 공식 자료에 맞는 그림이 있으면 그것을 넣었다. 링크만 두지 않고 페이지에 바로 보이며, 그림 아래에 출처가 있다. 직접 그린 그림은 트랙 `assets/diagrams/`의 `.d2` 소스를 `render-diagram.py`로 넣은 것이고 폭이 720 이하다. 모든 그림은 높이가 700px 이하여서 한 화면에 들어온다(`check-layout`의 figure-tall이 0). 요청 흐름 그림은 `.stepper`로 단계마다 상자와 표 줄이 함께 강조된다.
 11. **문체**: `python .tools/im-not-ai/check-korean.py <레슨>`을 실행하고 `.claude/rules/korean-humanize.md`로 산문을 읽는다. 패턴 수는 합격 기준이 아니다. 걸린 문장을 읽고 고칠 것만 적는다. 코드와 인용한 출력은 보지 않는다.
 
 반환 형식: 한 줄에 `항목 번호 | 위치(절·단계) | 문제 | 고칠 내용`. 문제가 없으면 "문제 없음".
@@ -34,7 +34,7 @@
 텍스트 검사를 모두 끝낸 뒤 이미지를 연다. 이미지를 연 뒤 도구를 더 부르면 호출마다 앞서 연 이미지 전부가 맥락에 다시 실린다. 스크립트는 저장소 루트에서 실행한다. 브리프에 볼 이미지 파일 목록이 있으면 1·2를 건너뛰고 3만 한다. 폴더만 있으면 스크립트 출력 폴더로 쓴다.
 
 1. 다음 셋을 한 Bash 호출에서 동시에 실행한다. 각각 `&`로 백그라운드에 보내고 `wait`로 모은다. 출력은 scratchpad 폴더의 파일로 돌린 뒤 읽는다.
-   - `python docs/learning/check-layout.py <레슨>`: 라이트 1000px·다크 500px에서 검사 6개를 DOM 숫자로 잰다: page-scroll, overflow(`pre`·표 칸·문단·목록 항목·그림·이미지·SVG), code-break, overlap, clip-y, contrast(WCAG AA; SVG `text`와 `::before`/`::after` 라벨 포함, 같은 색 쌍은 ` 외 N개`로 묶는다). 위반마다 `모드 | 절 [> N단계] | 검사 | 요소 | 측정값`, 없으면 `OK`. 500px `pre`의 가로 스크롤은 허용한다.
+   - `python docs/learning/check-layout.py <레슨>`: 라이트 1000px·다크 500px에서 검사 7개를 DOM 숫자로 잰다: page-scroll, overflow(`pre`·표 칸·문단·목록 항목·그림·이미지·SVG), code-break, figure-tall(`figure` 안 그림 높이 700px 초과), overlap, clip-y, contrast(WCAG AA; SVG `text`와 `::before`/`::after` 라벨 포함, 같은 색 쌍은 ` 외 N개`로 묶는다). 위반마다 `모드 | 절 [> N단계] | 검사 | 요소 | 측정값`, 없으면 `OK`. 500px `pre`의 가로 스크롤은 허용한다.
    - `python docs/learning/check-links.py <레슨>`: 외부 링크의 HTTP 상태와 `#` 조각의 id. 실패한 줄만, 없으면 `OK`.
    - `python docs/learning/render-sections.py <레슨> <scratchpad 폴더>`: 절마다 `<번호>-light.png`(1000px)와 `<번호>-dark.png`(500px)를 찍고 `번호 제목`을 출력한다. 긴 페이지를 한 장으로 찍으면 축소돼 표 안 글자를 볼 수 없어 절마다 찍는다.
 

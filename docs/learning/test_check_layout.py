@@ -53,6 +53,10 @@ body{{background:#fff;color:#111}}a{{color:inherit}}code{{overflow-wrap:anywhere
 <table style="border-collapse:collapse;width:300px"><tr><td style="border:1px solid #111">k</td><td style="border:1px solid #111"><code>org.springframework.web.servlet.HandlerInterceptor x</code></td></tr></table>
 <h2>relative-img-case</h2>
 <div style="width:400px"><img src="../assets/images/wide.png"></div>
+<h2>figure-tall-case</h2>
+<figure style="margin:0"><svg width="100" height="800"></svg></figure>
+<h2>control-figure</h2>
+<figure style="margin:0"><svg width="100" height="600"></svg></figure>
 <h2>bottom-case</h2>
 <div style="height:3000px"></div>
 <p style="color:#808080">bottom</p>
@@ -69,6 +73,7 @@ EXPECT = [
     (BOTH, "code-break-case", "code-break", ""),
     (BOTH, "code-break-space-case", "code-break", ""),
     (BOTH, "relative-img-case", "overflow", ""),
+    (BOTH, "figure-tall-case", "figure-tall", "800 > 700px"),
     (LIGHT, "light-contrast-case", "contrast", "4.48:1 < 4.5:1"),
     (DARK, "dark-contrast-case", "contrast", "2.51:1 < 4.5:1"),
     (DARK, "svg-rect-case", "contrast", "1.61:1"),
@@ -79,7 +84,7 @@ EXPECT = [
 ]
 # (모드, 절): 이 절의 줄이 있으면 안 된다
 FORBID = [(BOTH, "control-pass"), (BOTH, "control-large"), (BOTH, "control-bold"), (DARK, "control-pre"),
-          (BOTH, "control-wrap"), (BOTH, "control-table"),
+          (BOTH, "control-wrap"), (BOTH, "control-table"), (BOTH, "control-figure"),
           (BOTH, "control-code-space")]
 
 
