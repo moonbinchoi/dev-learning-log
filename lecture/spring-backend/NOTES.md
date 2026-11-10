@@ -20,6 +20,7 @@
   - 만들기: 레슨에 `<!-- d2:<이름> --><!-- /d2 -->`를 두고 `python docs/learning/render-diagram.py lecture/spring-backend/assets/diagrams/<이름>.d2 <레슨>`을 실행한다. 표시 사이에 SVG가 들어가고, 소스 옆에 강의 탭용 PNG가 생긴다(라이트 색).
   - 단계 보기: `<div class="stepper">` 안에 `<fieldset class="step-tabs">`의 `<input type="radio" name="<그림별 이름>" value="N">`, 그림, `<tr data-step="N">` 표를 둔다. 그림 상자에는 `class: [step; S3]`처럼 `S<N>`을 붙인다. 범례는 `<ul class="legend">`에 역할 이름을 클래스로 준다. 레슨에는 JS를 넣지 않는다.
 - 레슨에 "오늘 쓰는 API" 표를 넣는다. 과제에 처음 쓰는 애너테이션·클래스·설정을 한 줄씩 설명한다.
+- 채팅 설명은 짧게 쓴다(3회차 피드백: 장황해서 읽히지 않았다). 과제 조건은 완성된 문장이 아니라 클래스 → 메서드 → 필요한 조건 순으로, 모든 조건을 빠짐없이 같은 구조로 적는다.
 - 위 단계가 하나 끝날 때마다 아래 "현재 위치"를 갱신한다. 세션은 예고 없이 끊길 수 있다.
 
 ### 리마인드 회차(1·2회차)
@@ -78,11 +79,16 @@
 | 마무리 | — | — | 면접 질문 총정리, 포트폴리오용 README | — |
 
 ## 공유 파일 변경 요청
+- `docs/learning/operating-rules.md` 레슨 설계: 과제 조건을 쓰는 형식 규칙이 없다. 클래스 → 메서드 → 조건 순의 간결한 일관 구조로 쓰라는 규칙을 더한다(3회차 피드백).
+- `docs/learning/` 흐름도 도구(`render-diagram.py`, `check-layout.py`): 3회차 레슨의 흐름도(`login-check-flow`, `request-pipeline`)가 여전히 너무 크다는 피드백이다. 그림 높이 700px 이하 규칙이 이 그림들에 적용되지 않은 것으로 보이나 원인은 확인하지 않았다.
+- 흐름도와 레슨 HTML 레이아웃의 모범 사례를 웹 검색으로 모아 기준을 만든다(별도 세션).
 
 ## 현재 위치
-- **2회차 완료(2026-11-04), 다음은 3회차(MVC2 7장 로그인 체크: 필터 vs 인터셉터, `@Login` ArgumentResolver).** 시작 전에 `shop`의 `lesson-02` 브랜치를 커밋하고 `master`에 `--no-ff`로 병합했는지 확인한다.
-  - 3회차 회상 퀴즈(말로 받는다): 1회차 것(검증 실패 때 왜 리다이렉트하지 않는가, `Item`에 `@NotBlank`를 달면 검증되는가, 타입 오류에서 `BindingResult` 유무에 따른 결과와 상태 코드, `addAttribute`의 값이 URL에서 어디로 가는가)과 2회차 것(`invalidate()`가 지우는 것은 서버 세션인가 브라우저 쿠키인가, 쿠키 이름 `JSESSIONID`와 세션 속성 이름 `loginMember`의 차이, 임의 쿠키로 `GET /`을 보내면 상태 코드와 화면). 2회차에서는 1회차 4문항을 건너뛰었다.
-  - 3회차 코딩 전: 필터에서 `getSession(false)`를 쓰는 이유를 먼저 말하게 한다. 2회차 진단에서 몰랐고, 설명한 뒤 코드로는 확인하지 않았다. 면접 Q1(쿠키와 세션의 차이)은 "세션이 쿠키를 감싼다"고 뒤집어 답했으므로 다시 묻는다.
+- **3회차 완료(2026-11-10), 다음은 4회차(MVC2 8~9장 예외 처리: 오류 페이지 기본 동작, `@RestControllerAdvice`).** 시작 전에 `shop`의 `lesson-03` 브랜치를 커밋하고 `master`에 `--no-ff`로 병합했는지 확인한다.
+  - 4회차 회상 퀴즈 후보(말로 받는다): `postHandle`이 호출되지 않는 경우 둘(`preHandle`이 `false`, 컨트롤러 예외)과 `afterCompletion`이 받는 `ex`(3회차 면접 Q3에서 예외 쪽 이유가 빠졌다), `getSession(false)`를 쓰는 이유, 세션이 있는 것과 세션에 `loginMember`가 있는 것의 차이.
+  - 4회차 연결: 3회차에서 인터셉터 제외 경로에 `/error`를 넣었다. 스프링 부트의 오류 페이지도 `DispatcherServlet`을 거쳐 인터셉터를 지나기 때문이라고 말로만 설명했다. 8장에서 오류 페이지 동작을 배울 때 실행으로 확인한다.
+  - 코딩에서 이름이 비슷한 API(`hasMethodAnnotation`과 `hasParameterAnnotation`)를 틀렸고, 조건식의 `!`와 질문의 전제(로그인 여부)를 놓친 적이 있다. 처음 쓰는 API는 문서를 먼저 확인하게 하고, 흐름을 추적하기 전에 전제를 말하게 한다.
+  - 3회차 남은 일: `getSession()`으로 바꿔 `Set-Cookie`를 보는 실험(A-5)은 실행하지 않고 말로만 확인했다. `supportsParameter`가 항상 `true`일 때 실제로 어떤 파라미터를 가로채는지는 확인하지 못했다.
   - 2회차 남은 일: 타임아웃 실험(`server.servlet.session.timeout=1m`)은 실행하지 않고 정답만 받았다. 앱을 다시 띄우면 메모리 저장소는 비고 `TestDataInit`이 채운다.
   - 1회차에서 남은 일: `BindingResult`를 폼 파라미터 앞에 두면 어떻게 되는지(진단 Q3-c) 실행 확인을 못 했다. `ItemRepository`의 순번은 0부터 시작한다(선택 수정, `MemberRepository`도 같다).
   - 열린 질문(확인 안 됨, 과제가 아니라 실험 주제): `record` 폼 객체가 `th:field`·`BindingResult`와 함께 동작하는가, `void`가 아닌 setter(체이닝)를 스프링과 타임리프가 프로퍼티로 인식하는가.
