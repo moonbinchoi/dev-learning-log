@@ -179,7 +179,7 @@
 | 다른 트랙 learning-records 대조 | explorer. 브리프에 이번 회차 후보 개념 목록을 주고 `개념 \| 기록 경로:줄 \| 근거 인용` 형식으로 후보만 받는다. 이미 증명됐는지는 메인이 판단한다. |
 | 레슨 검토 | [lesson-review.md](lesson-review.md) 순서대로. 내용은 reviewer, 시각은 visual-reviewer. 사용자에게 열기 전에 한다. |
 
-`source-reader`에는 Write가 없다. 브리프에 출력 경로를 주지 않고 결과를 보고로 받는다. Claude 결정(미확인)
+`source-reader`에는 Write가 없다. 브리프에 출력 경로를 주지 않고 결과를 보고로 받는다.
 
 메인이 직접 하는 위임 예외:
 - 설명, 질의응답, 사용자와 리뷰 대화.
