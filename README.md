@@ -2,7 +2,7 @@
 
 백엔드 개발 학습 기록 저장소입니다. AI 튜터(Claude Code)와 1:1 수업 방식으로 공부하면서, 회차마다 만든 레슨, 학습 기록, 수업 운영 규칙을 그대로 남깁니다.
 
-학습은 2026년 10월 초에 시작했습니다. 이 저장소의 커밋 기록이 11월부터인 것은, 공개로 전환하면서 강의 교재 자료를 이력에서 지우느라 기록을 정리했기 때문입니다. 그 전 기록은 학습 기록 파일의 날짜(예: [docker 0006](lecture/docker-devcontainer/learning-records/0006-build-cache-and-context.md)의 2026-10-14)와 [spring-shop의 커밋 기록](https://github.com/moonbinchoi/spring-shop/commits)(2026-10-02부터)에 남아 있습니다.
+- 학습 시작: 2026년 10월 초 (주: 커밋 기록이 11월부터인 것은 repo를 Public으로 전환하면서 강의 교재 자료를 이력에서 지우느라 기록을 정리했기 때문).
 
 ## 학습 트랙
 
