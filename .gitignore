@@ -10,3 +10,15 @@ __pycache__/
 /.claude/worktrees/
 /.idea/
 /.vscode/
+
+# Not published: paid course material, local research, private notes
+/courses/
+/lecture/*/assets/course-figures/
+/docs/research/
+/docs/NEXT-SESSIONS.md
+/docs/issues/grading-criteria/
+/docs/design/2026-11-03-local-git/
+/.tools/d2/d2.exe
+/.superpowers/
+.pytest_cache/
+.env

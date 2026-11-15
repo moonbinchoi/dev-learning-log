@@ -166,11 +166,11 @@
 
 <h3>인터셉터의 세 메서드는 언제 불리는가</h3>
 <figure>
-<img src="../assets/images/interceptor-flow.png" alt="DispatcherServlet이 1 preHandle, 2 핸들러 어댑터를 통한 컨트롤러 호출, 3 ModelAndView 반환, 4 postHandle, 5 뷰 렌더링, 6 afterCompletion 순서로 진행하는 그림">
+<img src="../assets/course-figures/interceptor-flow.png" alt="DispatcherServlet이 1 preHandle, 2 핸들러 어댑터를 통한 컨트롤러 호출, 3 ModelAndView 반환, 4 postHandle, 5 뷰 렌더링, 6 afterCompletion 순서로 진행하는 그림">
 <figcaption>정상 흐름. <code>preHandle</code>은 핸들러 어댑터 호출 전, <code>postHandle</code>은 핸들러 어댑터 호출 후, <code>afterCompletion</code>은 뷰 렌더링 뒤에 불린다. 출처: 김영한 「스프링 MVC 2편」 7장 395줄 그림.</figcaption>
 </figure>
 <figure>
-<img src="../assets/images/interceptor-exception.png" alt="컨트롤러에서 예외가 나면 postHandle은 호출되지 않고 afterCompletion이 예외를 받아 호출된 뒤 예외가 WAS로 전달되는 그림">
+<img src="../assets/course-figures/interceptor-exception.png" alt="컨트롤러에서 예외가 나면 postHandle은 호출되지 않고 afterCompletion이 예외를 받아 호출된 뒤 예외가 WAS로 전달되는 그림">
 <figcaption>컨트롤러에서 예외가 난 흐름. <code>postHandle</code>은 불리지 않고, <code>afterCompletion</code>은 예외(<code>ex</code>)를 받아 불린다. 출처: 김영한 「스프링 MVC 2편」 7장 406줄 그림.</figcaption>
 </figure>
 <ul>

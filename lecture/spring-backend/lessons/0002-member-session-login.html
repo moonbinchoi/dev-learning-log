@@ -114,11 +114,11 @@
 </table>
 <p>세션도 쿠키를 쓴다. 교재는 이렇게 정리한다: "사실 세션이라는 것이 뭔가 특별한 것이 아니라 단지 쿠키를 사용하는데, 서버에서 데이터를 유지하는 방법일 뿐" (교재 6장 1092줄).</p>
 <figure>
-<img src="../assets/images/session-create.png" alt="로그인 요청을 받은 서버가 세션 ID zz0101xx를 만들어 세션 저장소에 memberA와 함께 보관하는 그림">
+<img src="../assets/course-figures/session-create.png" alt="로그인 요청을 받은 서버가 세션 ID zz0101xx를 만들어 세션 저장소에 memberA와 함께 보관하는 그림">
 <figcaption>로그인 성공 시 서버가 세션 ID를 만들어 회원과 함께 세션 저장소에 둔다. 교재 직접 구현 예제라 쿠키 이름이 <code>mySessionId</code>이고, <code>HttpSession</code>에서는 <code>JSESSIONID</code>다. 출처: 김영한 「스프링 MVC 2편」 6장 847줄 그림.</figcaption>
 </figure>
 <figure>
-<img src="../assets/images/session-after-login.png" alt="브라우저가 쿠키 저장소의 세션 ID를 GET 요청에 실어 보내고, 서버가 그 키로 세션 저장소를 조회해 홍길동님 화면을 응답하는 그림">
+<img src="../assets/course-figures/session-after-login.png" alt="브라우저가 쿠키 저장소의 세션 ID를 GET 요청에 실어 보내고, 서버가 그 키로 세션 저장소를 조회해 홍길동님 화면을 응답하는 그림">
 <figcaption>로그인 이후 요청. 브라우저는 세션 ID 쿠키를 싣고, 서버는 그 키로 세션 저장소를 조회한다. 이 그림도 교재 직접 구현 예제라 쿠키 이름이 <code>mySessionId</code>이고, <code>HttpSession</code>에서는 <code>JSESSIONID</code>다. 출처: 김영한 「스프링 MVC 2편」 6장 871줄 그림.</figcaption>
 </figure>
 
