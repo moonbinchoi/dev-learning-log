@@ -6,8 +6,8 @@
 
 | 트랙 | 상태 | 내용 | 실습 프로젝트 |
 |---|---|---|---|
-| [spring-backend](lecture/spring-backend/) | 진행 중 | 스프링 MVC 검증, 세션 로그인, 필터·인터셉터, DB 접근 | shop (상품 주문 관리 서비스) |
-| [docker-devcontainer](lecture/docker-devcontainer/) | 완료 (11회차) | Docker 기초, Compose, Dev Container 개발 환경 | docker-lab, shop-docker-devcontainer |
+| [spring-backend](lecture/spring-backend/) | 진행 중 | 스프링 MVC 검증, 세션 로그인, 필터·인터셉터, DB 접근 | [spring-shop](https://github.com/moonbinchoi/spring-shop) (상품 주문 관리 서비스) |
+| [docker-devcontainer](lecture/docker-devcontainer/) | 완료 (11회차) | Docker 기초, Compose, Dev Container 개발 환경 | [docker-lab](https://github.com/moonbinchoi/docker-lab), [spring-shop의 docker-devcontainer 브랜치](https://github.com/moonbinchoi/spring-shop/tree/docker-devcontainer) |
 
 전체 목록과 상태는 [lecture/TRACKS.md](lecture/TRACKS.md)에 있습니다. 실습 프로젝트 코드는 이 저장소가 아닌 별도 저장소에서 관리합니다.
 
